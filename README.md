@@ -1,7 +1,7 @@
 # sls (ssh ls)
 
 sls is a smart fuzzy CLI selector for SSH config hosts.  
-It provides a convenient way to select, preview, and connect to SSH hosts defined in your `~/.ssh/config` and modular config directories. With support for favorites and usage-based sorting, sls makes working with multiple remote hosts fast and efficient.
+It provides a convenient way to select, preview, and connect to SSH hosts defined in your `~/.ssh/config`. 
 
 ## Key Features
 
@@ -14,11 +14,11 @@ It provides a convenient way to select, preview, and connect to SSH hosts define
 
 ## Installation
 
-### Homebrew (macOS/Linux)
+### Homebrew (macOS)
 
 ```bash
 brew tap jinmugo/homebrew-sls
-brew install jinmugo/tap/sls
+brew install sls
 ````
 
 ### From Source
@@ -59,5 +59,5 @@ Favorites are marked with a `⋆` symbol and shown at the top of the list. Other
 - SSH config files:
   - `~/.ssh/config`
 - User-specific data:
-  - Usage counts and favorites are saved to `~/.config/sls/favs.json`
+  - Usage counts and favorites are saved to `~/.config/sls/meta.json`
 - fzf must be installed and available in the system PATH
