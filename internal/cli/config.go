@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -244,5 +245,27 @@ func runCfgUpsert(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	fmt.Printf("%s updated\n", alias)
+
+	h, _ = config.FindHost(cfg, alias)
+	if h != nil {
+		fmt.Println("--- Host Config ---")
+		var keys []string
+		for key := range consts.RequiredSSHConfigOptions {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			val := config.GetKV(h, key)
+			if val == "" && key != consts.SSHConfigHost {
+				fmt.Printf("\033[33m%s:\033[0m \033[90m(not set)\033[0m\n", key)
+			} else {
+				if key == consts.SSHConfigHost {
+					fmt.Printf("\033[36m%s:\033[0m %s\n", key, h.Patterns[0])
+				} else {
+					fmt.Printf("\033[36m%s:\033[0m %s\n", key, val)
+				}
+			}
+		}
+	}
 	return nil
 }
