@@ -52,7 +52,7 @@ func runInteractive(extraSSHArgs []string) error {
 				continue
 			}
 			if favStore.IsFavorite(pat) {
-				favAliases = append(favAliases, "⋆"+pat)
+				favAliases = append(favAliases, "⭐︎"+pat)
 			} else {
 				normalAliases = append(normalAliases, struct {
 					Alias string
@@ -95,7 +95,7 @@ func runInteractive(extraSSHArgs []string) error {
 	if choice == "" {
 		return nil
 	}
-	choice = strings.TrimPrefix(choice, "⋆")
+	choice = strings.TrimPrefix(choice, "⭐︎")
 
 	favStore.Increment(choice)
 

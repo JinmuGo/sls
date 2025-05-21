@@ -20,7 +20,7 @@ var previewCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		alias := strings.TrimSpace(strings.TrimPrefix(args[0], "⋆"))
+		alias := strings.TrimSpace(strings.TrimPrefix(args[0], "⭐︎"))
 		h, _ := config.FindHost(cfg, alias)
 		if h == nil {
 			fmt.Println("(no such host)")

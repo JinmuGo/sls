@@ -52,7 +52,7 @@ sls fav remove <alias>
 sls fav list
 ```
 
-Favorites are marked with a `⋆` symbol and shown at the top of the list. Other hosts are sorted based on how frequently they are used.
+Favorites are marked with a `⭐︎` symbol and shown at the top of the list. Other hosts are sorted based on how frequently they are used.
 
 ## Configuration
 
