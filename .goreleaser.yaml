@@ -52,7 +52,7 @@ brews:
   - name: sls
     repository:
       owner: jinmugo
-      name: homebrew-sls
+      name: homebrew-tap
     url_template: "https://github.com/jinmugo/sls/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
     commit_author:
       name: JinmuGo Bot

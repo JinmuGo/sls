@@ -1,7 +1,7 @@
 # sls (ssh ls)
 
 sls is a smart fuzzy CLI selector for SSH config hosts.  
-It provides a convenient way to select, preview, and connect to SSH hosts defined in your `~/.ssh/config`. 
+It provides a convenient way to select, preview, and connect to SSH hosts defined in your `~/.ssh/config`.
 
 ## Key Features
 
@@ -17,9 +17,9 @@ It provides a convenient way to select, preview, and connect to SSH hosts define
 ### Homebrew (macOS)
 
 ```bash
-brew tap jinmugo/homebrew-sls
+brew tap jinmugo/tap
 brew install sls
-````
+```
 
 ### From Source
 
