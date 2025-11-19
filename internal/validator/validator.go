@@ -5,6 +5,8 @@ import (
 	"net"
 	"regexp"
 	"strings"
+
+	"github.com/jinmugo/sls/internal/config"
 )
 
 var (
@@ -84,4 +86,21 @@ func ValidateUser(user string) error {
 		return fmt.Errorf("username must contain only alphanumeric characters, underscores, and hyphens")
 	}
 	return nil
+}
+
+// ValidateHostExists checks if a host exists in SSH config.
+// Returns an error if the host is not found in ~/.ssh/config.
+func ValidateHostExists(host string) error {
+	hosts, err := config.Parse("")
+	if err != nil {
+		return fmt.Errorf("parse ssh config: %w", err)
+	}
+
+	for _, h := range hosts {
+		if len(h.Patterns) > 0 && h.Patterns[0].String() == host {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("host %q not found in ~/.ssh/config", host)
 }

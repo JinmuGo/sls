@@ -7,6 +7,7 @@ import (
 
 	"github.com/jinmugo/sls/internal/config"
 	"github.com/jinmugo/sls/internal/favorites"
+	"github.com/jinmugo/sls/internal/validator"
 	"github.com/spf13/cobra"
 )
 
@@ -24,6 +25,11 @@ var tagAddCmd = &cobra.Command{
 	Short: "Add a tag to a host",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Validate that host exists in SSH config
+		if err := validator.ValidateHostExists(args[0]); err != nil {
+			return err
+		}
+
 		store, err := favorites.DefaultStore()
 		if err != nil {
 			return err
@@ -65,6 +71,11 @@ var tagRemoveCmd = &cobra.Command{
 	Short: "Remove a tag from a host",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Validate that host exists in SSH config
+		if err := validator.ValidateHostExists(args[0]); err != nil {
+			return err
+		}
+
 		store, err := favorites.DefaultStore()
 		if err != nil {
 			return err
@@ -119,6 +130,11 @@ var tagListCmd = &cobra.Command{
 	Short: "List tags for a host",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Validate that host exists in SSH config
+		if err := validator.ValidateHostExists(args[0]); err != nil {
+			return err
+		}
+
 		store, err := favorites.DefaultStore()
 		if err != nil {
 			return err

@@ -5,6 +5,7 @@ import (
 
 	"github.com/jinmugo/sls/internal/config"
 	"github.com/jinmugo/sls/internal/favorites"
+	"github.com/jinmugo/sls/internal/validator"
 	"github.com/spf13/cobra"
 )
 
@@ -22,6 +23,11 @@ var favAddCmd = &cobra.Command{
 	Short: "Add a host to favourites",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Validate that host exists in SSH config
+		if err := validator.ValidateHostExists(args[0]); err != nil {
+			return err
+		}
+
 		store, err := favorites.DefaultStore()
 		if err != nil {
 			return err
@@ -80,6 +86,11 @@ var favRemoveCmd = &cobra.Command{
 	Short: "Remove a host from favourites",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Validate that host exists in SSH config
+		if err := validator.ValidateHostExists(args[0]); err != nil {
+			return err
+		}
+
 		store, err := favorites.DefaultStore()
 		if err != nil {
 			return err

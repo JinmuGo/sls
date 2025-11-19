@@ -7,6 +7,7 @@ import (
 
 	"github.com/jinmugo/sls/internal/config"
 	"github.com/jinmugo/sls/internal/tester"
+	"github.com/jinmugo/sls/internal/validator"
 	"github.com/spf13/cobra"
 )
 
@@ -23,6 +24,12 @@ This command attempts to connect via SSH and run a simple echo command.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		host := args[0]
+
+		// Validate that host exists in SSH config
+		if err := validator.ValidateHostExists(host); err != nil {
+			return err
+		}
+
 		timeout := time.Duration(testTimeout) * time.Second
 
 		fmt.Printf("Testing connection to %s (timeout: %v)...\n", host, timeout)
