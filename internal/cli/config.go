@@ -237,7 +237,10 @@ func runCfgUpsert(cmd *cobra.Command, args []string) error {
 		extra[key] = strings.TrimSpace(val)
 	}
 
-	h = config.UpsertHost(cfg, alias, flagHostName, flagUser, flagPort)
+	h, err = config.UpsertHost(cfg, alias, flagHostName, flagUser, flagPort)
+	if err != nil {
+		return err
+	}
 	for k, v := range extra {
 		config.SetKV(h, k, v)
 	}

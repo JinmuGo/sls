@@ -2,6 +2,7 @@ package favorites
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -16,30 +17,50 @@ type Store struct {
 	data map[string]entry
 }
 
-func DefaultStore() *Store {
-	home, _ := os.UserHomeDir()
+func DefaultStore() (*Store, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("get home directory: %w", err)
+	}
 	metaPath := filepath.Join(home, ".config", "sls", "meta.json")
 	return NewStore(metaPath)
 }
 
-func NewStore(path string) *Store {
+func NewStore(path string) (*Store, error) {
 	s := &Store{path: path, data: make(map[string]entry)}
-	s.load()
-	return s
+	if err := s.load(); err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
-func (s *Store) load() {
+func (s *Store) load() error {
 	b, err := os.ReadFile(s.path)
 	if err != nil {
-		return
+		// File not existing is not an error for first time usage
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("read meta file: %w", err)
 	}
-	_ = json.Unmarshal(b, &s.data)
+	if err := json.Unmarshal(b, &s.data); err != nil {
+		return fmt.Errorf("parse meta file %s: %w (file may be corrupted)", s.path, err)
+	}
+	return nil
 }
 
 func (s *Store) save() error {
-	b, _ := json.MarshalIndent(s.data, "", "  ")
-	os.MkdirAll(filepath.Dir(s.path), 0o755)
-	return os.WriteFile(s.path, b, 0o644)
+	b, err := json.MarshalIndent(s.data, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal meta data: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
+		return fmt.Errorf("create config directory: %w", err)
+	}
+	if err := os.WriteFile(s.path, b, 0o644); err != nil {
+		return fmt.Errorf("write meta file: %w", err)
+	}
+	return nil
 }
 
 func (s *Store) Add(h string) error {
@@ -75,11 +96,11 @@ func (s *Store) IsFavorite(h string) bool {
 	return false
 }
 
-func (s *Store) Increment(h string) {
+func (s *Store) Increment(h string) error {
 	e := s.data[h]
 	e.Count++
 	s.data[h] = e
-	_ = s.save()
+	return s.save()
 }
 
 func (s *Store) Count(h string) int {

@@ -71,10 +71,14 @@ func SetKV(h *sshconfig.Host, key, val string) {
 	h.Nodes = append(h.Nodes, &sshconfig.KV{Key: key, Value: val})
 }
 
-func UpsertHost(cfg *sshconfig.Config, alias, hostname, user string, port int) *sshconfig.Host {
+func UpsertHost(cfg *sshconfig.Config, alias, hostname, user string, port int) (*sshconfig.Host, error) {
 	h, _ := FindHost(cfg, alias)
 	if h == nil {
-		h = &sshconfig.Host{Patterns: []*sshconfig.Pattern{mustPattern(alias)}}
+		p, err := sshconfig.NewPattern(alias)
+		if err != nil {
+			return nil, fmt.Errorf("invalid alias pattern %q: %w", alias, err)
+		}
+		h = &sshconfig.Host{Patterns: []*sshconfig.Pattern{p}}
 		cfg.Hosts = append(cfg.Hosts, h)
 	}
 	SetKV(h, consts.SSHConfigHostName, hostname)
@@ -82,7 +86,7 @@ func UpsertHost(cfg *sshconfig.Config, alias, hostname, user string, port int) *
 	if port > 0 {
 		SetKV(h, consts.SSHConfigPort, fmt.Sprint(port))
 	}
-	return h
+	return h, nil
 }
 
 func DeleteHost(cfg *sshconfig.Config, alias string) bool {
@@ -97,10 +101,3 @@ func DeleteHost(cfg *sshconfig.Config, alias string) bool {
 	return true
 }
 
-func mustPattern(s string) *sshconfig.Pattern {
-	p, err := sshconfig.NewPattern(s)
-	if err != nil {
-		panic(err)
-	}
-	return p
-}

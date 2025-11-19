@@ -22,7 +22,10 @@ var favAddCmd = &cobra.Command{
 	Short: "Add a host to favourites",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		store := favorites.DefaultStore()
+		store, err := favorites.DefaultStore()
+		if err != nil {
+			return err
+		}
 		return store.Add(args[0])
 	},
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -30,7 +33,10 @@ var favAddCmd = &cobra.Command{
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		store := favorites.DefaultStore()
+		store, err := favorites.DefaultStore()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
 		favSet := map[string]struct{}{}
 		for _, h := range store.List() {
 			favSet[h] = struct{}{}
@@ -58,7 +64,10 @@ var favListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List favourites",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		store := favorites.DefaultStore()
+		store, err := favorites.DefaultStore()
+		if err != nil {
+			return err
+		}
 		for _, h := range store.List() {
 			cmd.Println(h)
 		}
@@ -71,11 +80,17 @@ var favRemoveCmd = &cobra.Command{
 	Short: "Remove a host from favourites",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		store := favorites.DefaultStore()
+		store, err := favorites.DefaultStore()
+		if err != nil {
+			return err
+		}
 		return store.Remove(args[0])
 	},
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		store := favorites.DefaultStore()
+		store, err := favorites.DefaultStore()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
 		var candidates []string
 		for _, h := range store.List() {
 			if toComplete == "" || strings.HasPrefix(h, toComplete) {

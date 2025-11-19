@@ -37,7 +37,10 @@ func runInteractive(extraSSHArgs []string) error {
 		return fmt.Errorf("no Host entries found in ssh_config")
 	}
 
-	favStore := favorites.DefaultStore()
+	favStore, err := favorites.DefaultStore()
+	if err != nil {
+		return fmt.Errorf("load favorites: %w", err)
+	}
 	favMap := map[string]struct{}{}
 	favCounts := map[string]int{}
 	for _, h := range favStore.List() {
@@ -77,6 +80,11 @@ func runInteractive(extraSSHArgs []string) error {
 		aliases = append(aliases, n.Alias)
 	}
 
+	// Check if fzf is available
+	if _, err := exec.LookPath("fzf"); err != nil {
+		return fmt.Errorf("fzf not found in PATH. Please install fzf: https://github.com/junegunn/fzf")
+	}
+
 	fzf := exec.Command("fzf",
 		"--prompt", "sls> ",
 		"--height", "~50%",
@@ -102,7 +110,10 @@ func runInteractive(extraSSHArgs []string) error {
 	}
 	choice = strings.TrimPrefix(choice, "⭐︎")
 
-	favStore.Increment(choice)
+	if err := favStore.Increment(choice); err != nil {
+		// Don't fail on increment error, just log to stderr
+		fmt.Fprintf(os.Stderr, "Warning: failed to update usage count: %v\n", err)
+	}
 
 	return runner.SSH(choice, extraSSHArgs)
 }
