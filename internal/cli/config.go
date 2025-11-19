@@ -10,6 +10,7 @@ import (
 
 	"github.com/jinmugo/sls/internal/config"
 	"github.com/jinmugo/sls/internal/consts"
+	"github.com/jinmugo/sls/internal/validator"
 	"github.com/ktr0731/go-fuzzyfinder"
 	"github.com/spf13/cobra"
 )
@@ -128,6 +129,12 @@ func init() {
 
 func runCfgUpsert(cmd *cobra.Command, args []string) error {
 	alias := args[0]
+
+	// Validate alias
+	if err := validator.ValidateAlias(alias); err != nil {
+		return fmt.Errorf("invalid alias: %w", err)
+	}
+
 	reader := bufio.NewReader(os.Stdin)
 
 	if cmd.Name() == "edit" {
@@ -208,6 +215,23 @@ func runCfgUpsert(cmd *cobra.Command, args []string) error {
 			}
 		} else if curPort != 0 {
 			flagPort = curPort
+		}
+	}
+
+	// Validate inputs before saving
+	if flagHostName != "" {
+		if err := validator.ValidateHostname(flagHostName); err != nil {
+			return fmt.Errorf("invalid hostname: %w", err)
+		}
+	}
+	if flagUser != "" {
+		if err := validator.ValidateUser(flagUser); err != nil {
+			return fmt.Errorf("invalid user: %w", err)
+		}
+	}
+	if flagPort > 0 {
+		if err := validator.ValidatePort(flagPort); err != nil {
+			return fmt.Errorf("invalid port: %w", err)
 		}
 	}
 

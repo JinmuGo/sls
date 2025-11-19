@@ -46,7 +46,8 @@ func SaveAST(cfg *sshconfig.Config, path string) error {
 		}
 		buf.WriteString("\n")
 	}
-	return os.WriteFile(path, buf.Bytes(), 0o644)
+	// SSH config files should be 0600 for security
+	return os.WriteFile(path, buf.Bytes(), 0o600)
 }
 
 func FindHost(cfg *sshconfig.Config, alias string) (*sshconfig.Host, int) {
