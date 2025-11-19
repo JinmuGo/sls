@@ -137,6 +137,7 @@ func init() {
 	rootCmd.AddCommand(cli.ConfigCmd)
 	rootCmd.AddCommand(cli.FavCmd)
 	rootCmd.AddCommand(cli.TagCmd)
+	rootCmd.AddCommand(cli.TestCmd)
 	rootCmd.AddCommand(cli.CompletionCmd)
 	rootCmd.AddCommand(cli.PreviewCmd)
 
