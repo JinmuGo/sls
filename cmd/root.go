@@ -15,6 +15,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	filterTag string
+)
+
 var rootCmd = &cobra.Command{
 	Use:   "sls",
 	Short: "ssh ls with fuzzyfinder",
@@ -57,6 +61,10 @@ func runInteractive(extraSSHArgs []string) error {
 		if len(h.Patterns) > 0 {
 			pat := h.Patterns[0].String()
 			if pat == "*" {
+				continue
+			}
+			// Filter by tag if specified
+			if filterTag != "" && !favStore.HasTag(pat, filterTag) {
 				continue
 			}
 			if favStore.IsFavorite(pat) {
@@ -128,6 +136,10 @@ func Execute() {
 func init() {
 	rootCmd.AddCommand(cli.ConfigCmd)
 	rootCmd.AddCommand(cli.FavCmd)
+	rootCmd.AddCommand(cli.TagCmd)
 	rootCmd.AddCommand(cli.CompletionCmd)
 	rootCmd.AddCommand(cli.PreviewCmd)
+
+	// Add --tag flag for filtering hosts by tag
+	rootCmd.Flags().StringVarP(&filterTag, "tag", "t", "", "Filter hosts by tag")
 }

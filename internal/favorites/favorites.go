@@ -7,14 +7,16 @@ import (
 	"path/filepath"
 )
 
-type entry struct {
-	Favorite bool `json:"favorite"`
-	Count    int  `json:"count"`
+// Entry represents metadata for a single host
+type Entry struct {
+	Favorite bool     `json:"favorite"`
+	Count    int      `json:"count"`
+	Tags     []string `json:"tags,omitempty"`
 }
 
 type Store struct {
 	path string
-	data map[string]entry
+	data map[string]Entry
 }
 
 func DefaultStore() (*Store, error) {
@@ -27,7 +29,7 @@ func DefaultStore() (*Store, error) {
 }
 
 func NewStore(path string) (*Store, error) {
-	s := &Store{path: path, data: make(map[string]entry)}
+	s := &Store{path: path, data: make(map[string]Entry)}
 	if err := s.load(); err != nil {
 		return nil, err
 	}
@@ -108,4 +110,87 @@ func (s *Store) Count(h string) int {
 		return e.Count
 	}
 	return 0
+}
+
+// AddTag adds a tag to a host
+func (s *Store) AddTag(h, tag string) error {
+	if tag == "" {
+		return fmt.Errorf("tag cannot be empty")
+	}
+	e := s.data[h]
+	// Check if tag already exists
+	for _, t := range e.Tags {
+		if t == tag {
+			return fmt.Errorf("tag %q already exists for host %q", tag, h)
+		}
+	}
+	e.Tags = append(e.Tags, tag)
+	s.data[h] = e
+	return s.save()
+}
+
+// RemoveTag removes a tag from a host
+func (s *Store) RemoveTag(h, tag string) error {
+	e, ok := s.data[h]
+	if !ok {
+		return nil // Host doesn't exist, nothing to do
+	}
+
+	found := false
+	newTags := []string{}
+	for _, t := range e.Tags {
+		if t != tag {
+			newTags = append(newTags, t)
+		} else {
+			found = true
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("tag %q not found for host %q", tag, h)
+	}
+
+	e.Tags = newTags
+	s.data[h] = e
+	return s.save()
+}
+
+// GetTags returns all tags for a host
+func (s *Store) GetTags(h string) []string {
+	if e, ok := s.data[h]; ok {
+		return e.Tags
+	}
+	return nil
+}
+
+// ListAllTags returns all unique tags across all hosts
+func (s *Store) ListAllTags() []string {
+	tagSet := make(map[string]struct{})
+	for _, e := range s.data {
+		for _, tag := range e.Tags {
+			tagSet[tag] = struct{}{}
+		}
+	}
+	tags := make([]string, 0, len(tagSet))
+	for tag := range tagSet {
+		tags = append(tags, tag)
+	}
+	return tags
+}
+
+// HasTag checks if a host has a specific tag
+func (s *Store) HasTag(h, tag string) bool {
+	if e, ok := s.data[h]; ok {
+		for _, t := range e.Tags {
+			if t == tag {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// Data returns the internal data map (for iteration)
+func (s *Store) Data() map[string]Entry {
+	return s.data
 }
