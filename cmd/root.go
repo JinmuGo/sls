@@ -19,6 +19,11 @@ var rootCmd = &cobra.Command{
 	Use:   "sls",
 	Short: "ssh ls with fuzzyfinder",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Handle --version flag
+		if versionFlag, _ := cmd.Flags().GetBool("version"); versionFlag {
+			cmd.Root().SetArgs([]string{"version"})
+			return cmd.Root().Execute()
+		}
 		return runInteractive(args)
 	},
 }

@@ -20,6 +20,12 @@ builds:
       - linux
       - windows
       - darwin
+    ldflags:
+      - -s -w
+      - -X github.com/jinmugo/sls/cmd.version={{.Version}}
+      - -X github.com/jinmugo/sls/cmd.commit={{.Commit}}
+      - -X github.com/jinmugo/sls/cmd.date={{.Date}}
+      - -X github.com/jinmugo/sls/cmd.builtBy=goreleaser
 
 archives:
   - formats: [tar.gz]
