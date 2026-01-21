@@ -72,3 +72,23 @@ brews:
       bin.install "sls"
     dependencies:
       - name: fzf
+
+nfpms:
+  - id: sls
+    package_name: sls
+    vendor: jinmugo
+    homepage: https://github.com/jinmugo/sls
+    maintainer: JinmuGo <hi@jinmugo.me>
+    description: A smart fuzzy CLI selector for SSH config hosts
+    license: MIT
+    formats:
+      - deb
+      - rpm
+    dependencies:
+      - fzf
+    bindir: /usr/bin
+    contents:
+      - src: ./LICENSE
+        dst: /usr/share/doc/sls/LICENSE
+        file_info:
+          mode: 0644
