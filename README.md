@@ -1,9 +1,9 @@
 # sls (ssh ls)
 
-<img width="1428" height="338" alt="sls-example" src="https://github.com/user-attachments/assets/b99d18b5-848d-41a3-9b93-8f8ecbe982f4" />
-
 sls is a smart fuzzy CLI selector for SSH config hosts.  
 It provides a convenient way to select, preview, and connect to SSH hosts defined in your `~/.ssh/config`.
+
+<img width="1428" height="338" alt="sls-example" src="https://github.com/user-attachments/assets/b99d18b5-848d-41a3-9b93-8f8ecbe982f4" />
 
 ## Key Features
 
