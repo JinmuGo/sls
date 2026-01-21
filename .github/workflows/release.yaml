@@ -4,7 +4,7 @@ on:
   pull_request:
   push:
     tags:
-      - "*"
+      - "v*"
 
 permissions:
   contents: write
@@ -26,9 +26,9 @@ jobs:
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
-          # either 'goreleaser' (default) or 'goreleaser-pro'
           distribution: goreleaser
           version: "~> v2"
-          args: release --clean
+          # PR에서는 snapshot 모드로 테스트, 태그 푸시에서는 실제 릴리즈
+          args: ${{ github.event_name == 'pull_request' && 'release --snapshot --skip=publish --clean' || 'release --clean' }}
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
