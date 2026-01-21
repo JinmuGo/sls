@@ -93,12 +93,15 @@ func runInteractive(extraSSHArgs []string) error {
 		return fmt.Errorf("fzf not found in PATH. Please install fzf: https://github.com/junegunn/fzf")
 	}
 
-	fzf := exec.Command("fzf",
-		"--prompt", "sls> ",
-		"--height", "~50%",
-		"--layout", "reverse",
-		"--preview", "sls preview {}",
-	)
+	fzfArgs := []string{"--prompt", "sls > ", "--preview", "sls preview {}"}
+	if os.Getenv("FZF_DEFAULT_OPTS") == "" {
+		fzfArgs = append(fzfArgs,
+			"--height", "~50%",
+			"--layout", "reverse",
+		)
+	}
+
+	fzf := exec.Command("fzf", fzfArgs...)
 	fzf.Stdin = strings.NewReader(strings.Join(aliases, "\n"))
 
 	var out bytes.Buffer
