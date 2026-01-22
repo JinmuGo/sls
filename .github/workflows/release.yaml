@@ -28,7 +28,6 @@ jobs:
         with:
           distribution: goreleaser
           version: "~> v2"
-          # PR에서는 snapshot 모드로 테스트, 태그 푸시에서는 실제 릴리즈
           args: ${{ github.event_name == 'pull_request' && 'release --snapshot --skip=publish --clean' || 'release --clean' }}
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
