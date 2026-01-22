@@ -1,0 +1,181 @@
+name: Publish Packages
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (e.g., v1.0.0)"
+        required: true
+        type: string
+
+env:
+  PACKAGE_NAME: sls
+  PACKAGE_REPO: jinmugo/sls
+  PACKAGE_DESC: A smart fuzzy CLI selector for SSH config hosts
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout package repository
+        uses: actions/checkout@v4
+        with:
+          repository: jinmugo/package.jinmu.me
+          token: ${{ secrets.PACKAGE_REPO_TOKEN }}
+          path: package-repo
+
+      - name: Set release tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p artifacts
+          cd artifacts
+          gh release download ${{ steps.tag.outputs.tag }} \
+            --repo ${{ env.PACKAGE_REPO }} \
+            --pattern "*.deb" \
+            --pattern "*.rpm"
+          ls -la
+
+      - name: Import GPG key
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+          echo "allow-preset-passphrase" >> ~/.gnupg/gpg-agent.conf
+          gpg-connect-agent reloadagent /bye
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev createrepo-c
+
+      - name: Setup APT repository
+        env:
+          PKG_NAME: ${{ env.PACKAGE_NAME }}
+        run: |
+          # Get first letter for pool directory structure
+          FIRST_LETTER=$(echo "$PKG_NAME" | cut -c1)
+
+          # Create directory structure for this package
+          mkdir -p "package-repo/deb/pool/main/${FIRST_LETTER}/${PKG_NAME}"
+          mkdir -p package-repo/deb/dists/stable/main/binary-amd64
+          mkdir -p package-repo/deb/dists/stable/main/binary-arm64
+
+          # Copy deb packages to pool
+          cp artifacts/*.deb "package-repo/deb/pool/main/${FIRST_LETTER}/${PKG_NAME}/" || true
+
+          # Generate Packages files (scans entire pool for all packages)
+          cd package-repo/deb
+
+          # For amd64
+          dpkg-scanpackages --arch amd64 pool/ > dists/stable/main/binary-amd64/Packages
+          gzip -k -f dists/stable/main/binary-amd64/Packages
+
+          # For arm64
+          dpkg-scanpackages --arch arm64 pool/ > dists/stable/main/binary-arm64/Packages
+          gzip -k -f dists/stable/main/binary-arm64/Packages
+
+          # Generate Release file
+          cd dists/stable
+          cat > Release << 'EOF'
+          Origin: jinmugo
+          Label: jinmugo
+          Suite: stable
+          Codename: stable
+          Architectures: amd64 arm64
+          Components: main
+          Description: jinmugo package repository
+          EOF
+          echo "Date: $(date -Ru)" >> Release
+
+          # Add checksums to Release file
+          {
+            echo "MD5Sum:"
+            find main -type f \( -name "Packages*" \) -exec sh -c 'echo " $(md5sum "$1" | cut -d" " -f1) $(stat -c%s "$1") $1"' _ {} \;
+            echo "SHA256:"
+            find main -type f \( -name "Packages*" \) -exec sh -c 'echo " $(sha256sum "$1" | cut -d" " -f1) $(stat -c%s "$1") $1"' _ {} \;
+          } >> Release
+
+          # Sign Release file
+          echo "${{ secrets.GPG_PASSPHRASE }}" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+            --default-key "${{ secrets.GPG_KEY_ID }}" \
+            -abs -o Release.gpg Release
+
+          echo "${{ secrets.GPG_PASSPHRASE }}" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+            --default-key "${{ secrets.GPG_KEY_ID }}" \
+            --clearsign -o InRelease Release
+
+      - name: Setup YUM/DNF repository
+        run: |
+          # Create directory structure
+          mkdir -p package-repo/rpm/packages
+
+          # Copy rpm packages (accumulates with existing packages)
+          cp artifacts/*.rpm package-repo/rpm/packages/ || true
+
+          # Generate repository metadata (indexes all packages)
+          cd package-repo/rpm
+          createrepo_c .
+
+          # Sign repository metadata
+          echo "${{ secrets.GPG_PASSPHRASE }}" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+            --default-key "${{ secrets.GPG_KEY_ID }}" \
+            -abs -o repodata/repomd.xml.asc repodata/repomd.xml
+
+      - name: Export GPG public key
+        run: |
+          gpg --armor --export "${{ secrets.GPG_KEY_ID }}" > package-repo/gpg.key
+
+      - name: Update package index
+        env:
+          PKG_NAME: ${{ env.PACKAGE_NAME }}
+          PKG_TAG: ${{ steps.tag.outputs.tag }}
+          PKG_REPO: ${{ env.PACKAGE_REPO }}
+          PKG_DESC: ${{ env.PACKAGE_DESC }}
+        run: |
+          cd package-repo
+
+          # Create/update packages.json for tracking
+          if [ ! -f packages.json ]; then
+            echo '{"packages":{}}' > packages.json
+          fi
+
+          # Update package info using jq
+          cat packages.json | jq \
+            --arg name "$PKG_NAME" \
+            --arg version "$PKG_TAG" \
+            --arg repo "$PKG_REPO" \
+            --arg desc "$PKG_DESC" \
+            '.packages[$name] = {"version": $version, "repo": $repo, "description": $desc, "updated": now | strftime("%Y-%m-%dT%H:%M:%SZ")}' \
+            > packages.json.tmp && mv packages.json.tmp packages.json
+
+      - name: Commit and push to repository
+        env:
+          PKG_NAME: ${{ env.PACKAGE_NAME }}
+          PKG_TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          cd package-repo
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          git add -A
+          git diff --staged --quiet || git commit -m "Update ${PKG_NAME} to ${PKG_TAG}"
+          git push
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy package-repo --project-name=package-jinmu-me

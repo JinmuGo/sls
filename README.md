@@ -23,6 +23,36 @@ brew tap jinmugo/tap
 brew install sls
 ```
 
+### Debian/Ubuntu (apt)
+
+```bash
+# Add GPG key
+curl -fsSL https://package.jinmu.me/gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/sls.gpg
+
+# Add repository
+echo "deb [signed-by=/etc/apt/keyrings/sls.gpg] https://package.jinmu.me/deb stable main" | sudo tee /etc/apt/sources.list.d/sls.list
+
+# Install
+sudo apt update && sudo apt install sls
+```
+
+### Fedora/RHEL (dnf/yum)
+
+```bash
+# Add repository
+sudo tee /etc/yum.repos.d/sls.repo << EOF
+[sls]
+name=sls
+baseurl=https://package.jinmu.me/rpm
+enabled=1
+gpgcheck=1
+gpgkey=https://package.jinmu.me/gpg.key
+EOF
+
+# Install
+sudo dnf install sls
+```
+
 ### From Source
 
 ```bash
