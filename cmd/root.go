@@ -94,7 +94,7 @@ func runInteractive(extraSSHArgs []string) error {
 	}
 
 	fzfArgs := []string{"--prompt", "sls > ", "--preview", "sls preview {}"}
-	if os.Getenv("FZF_DEFAULT_OPTS") == "" {
+	if !hasUserFzfConfig() {
 		fzfArgs = append(fzfArgs,
 			"--height", "~50%",
 			"--layout", "reverse",
@@ -127,6 +127,18 @@ func runInteractive(extraSSHArgs []string) error {
 	}
 
 	return runner.SSH(choice, extraSSHArgs)
+}
+
+func hasUserFzfConfig() bool {
+	if os.Getenv("FZF_DEFAULT_OPTS") != "" {
+		return true
+	}
+	if optsFile := os.Getenv("FZF_DEFAULT_OPTS_FILE"); optsFile != "" {
+		if _, err := os.Stat(optsFile); err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 func Execute() {
