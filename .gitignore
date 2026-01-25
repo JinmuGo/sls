@@ -1,1 +1,3 @@
 sls
+dist/
+package-repo-test/
