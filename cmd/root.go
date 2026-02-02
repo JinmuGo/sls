@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -11,6 +12,7 @@ import (
 	"github.com/jinmugo/sls/internal/cli"
 	"github.com/jinmugo/sls/internal/config"
 	"github.com/jinmugo/sls/internal/favorites"
+	"github.com/jinmugo/sls/internal/onboarding"
 	"github.com/jinmugo/sls/internal/runner"
 	"github.com/spf13/cobra"
 )
@@ -35,10 +37,46 @@ var rootCmd = &cobra.Command{
 func runInteractive(extraSSHArgs []string) error {
 	hosts, err := config.Parse("")
 	if err != nil {
-		return fmt.Errorf("parse ssh_config: %w", err)
+		if errors.Is(err, config.ErrSSHDirNotExist) || errors.Is(err, config.ErrSSHConfigNotExist) {
+			retry, alias, onboardErr := onboarding.HandleMissingConfig(err)
+			if onboardErr != nil {
+				return onboardErr
+			}
+			if alias != "" {
+				if err := cli.RunConfigAdd(alias); err != nil {
+					return err
+				}
+			}
+			if !retry {
+				return nil
+			}
+			// Re-parse after creating config
+			hosts, err = config.Parse("")
+			if err != nil {
+				return fmt.Errorf("parse ssh_config: %w", err)
+			}
+		} else {
+			return fmt.Errorf("parse ssh_config: %w", err)
+		}
 	}
 	if len(hosts) == 0 {
-		return fmt.Errorf("no Host entries found in ssh_config")
+		retry, alias, _ := onboarding.HandleEmptyConfig()
+		if alias != "" {
+			if err := cli.RunConfigAdd(alias); err != nil {
+				return err
+			}
+		}
+		if !retry {
+			return nil
+		}
+		// Re-parse after adding first host
+		hosts, err = config.Parse("")
+		if err != nil {
+			return fmt.Errorf("parse ssh_config: %w", err)
+		}
+		if len(hosts) == 0 {
+			return nil
+		}
 	}
 
 	favStore, err := favorites.DefaultStore()

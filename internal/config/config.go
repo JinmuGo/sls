@@ -15,6 +15,13 @@ func Parse(path string) ([]*sshconfig.Host, error) {
 	}
 	f, err := os.Open(path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			sshDir := filepath.Dir(path)
+			if _, statErr := os.Stat(sshDir); os.IsNotExist(statErr) {
+				return nil, ErrSSHDirNotExist
+			}
+			return nil, ErrSSHConfigNotExist
+		}
 		return nil, err
 	}
 	defer f.Close()

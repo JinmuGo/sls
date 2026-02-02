@@ -127,9 +127,36 @@ func init() {
 	configCmd.AddCommand(cfgListCmd, cfgAddCmd, cfgEditCmd, cfgRemoveCmd)
 }
 
+// RunConfigAdd is an exported function to add a host programmatically.
+// It ensures SSH config exists before adding.
+func RunConfigAdd(alias string) error {
+	// Reset flags for fresh input
+	flagHostName = ""
+	flagUser = ""
+	flagPort = 0
+
+	// Ensure SSH config file exists
+	if _, err := config.EnsureSSHConfig(); err != nil {
+		return err
+	}
+	return runCfgUpsertWithAlias(alias, false)
+}
+
 func runCfgUpsert(cmd *cobra.Command, args []string) error {
 	alias := args[0]
+	isEdit := cmd.Name() == "edit"
 
+	// For add command, ensure SSH config exists
+	if !isEdit {
+		if _, err := config.EnsureSSHConfig(); err != nil {
+			return err
+		}
+	}
+
+	return runCfgUpsertWithAlias(alias, isEdit)
+}
+
+func runCfgUpsertWithAlias(alias string, isEdit bool) error {
 	// Validate alias
 	if err := validator.ValidateAlias(alias); err != nil {
 		return fmt.Errorf("invalid alias: %w", err)
@@ -137,7 +164,7 @@ func runCfgUpsert(cmd *cobra.Command, args []string) error {
 
 	reader := bufio.NewReader(os.Stdin)
 
-	if cmd.Name() == "edit" {
+	if isEdit {
 		hosts, err := config.Parse("")
 		if err != nil {
 			return err

@@ -18,6 +18,13 @@ func LoadAST(custom string) (*sshconfig.Config, string, error) {
 	}
 	f, err := os.Open(path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			sshDir := filepath.Dir(path)
+			if _, statErr := os.Stat(sshDir); os.IsNotExist(statErr) {
+				return nil, path, ErrSSHDirNotExist
+			}
+			return nil, path, ErrSSHConfigNotExist
+		}
 		return nil, path, err
 	}
 	defer f.Close()
@@ -100,5 +107,37 @@ func DeleteHost(cfg *sshconfig.Config, alias string) bool {
 	}
 	cfg.Hosts = append(cfg.Hosts[:idx], cfg.Hosts[idx+1:]...)
 	return true
+}
+
+// EnsureSSHConfig creates ~/.ssh directory and ~/.ssh/config file if they don't exist.
+// Returns the path to the config file.
+func EnsureSSHConfig() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("cannot determine home directory: %w", err)
+	}
+
+	sshDir := filepath.Join(home, ".ssh")
+	configPath := filepath.Join(sshDir, "config")
+
+	// Check and create ~/.ssh directory
+	if _, err := os.Stat(sshDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(sshDir, 0o700); err != nil {
+			return "", fmt.Errorf("failed to create %s: %w", sshDir, err)
+		}
+		fmt.Printf("\u2713 Created %s (mode: 700)\n", sshDir)
+	}
+
+	// Check and create ~/.ssh/config file
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		f, err := os.OpenFile(configPath, os.O_CREATE|os.O_WRONLY, 0o600)
+		if err != nil {
+			return "", fmt.Errorf("failed to create %s: %w", configPath, err)
+		}
+		f.Close()
+		fmt.Printf("\u2713 Created %s (mode: 600)\n", configPath)
+	}
+
+	return configPath, nil
 }
 
