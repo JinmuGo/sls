@@ -124,7 +124,15 @@ func init() {
 		},
 	}
 
-	configCmd.AddCommand(cfgListCmd, cfgAddCmd, cfgEditCmd, cfgRemoveCmd)
+	cfgFormatCmd := &cobra.Command{
+		Use:   "format",
+		Short: "Format ~/.ssh/config with consistent style",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return config.FormatConfig("")
+		},
+	}
+
+	configCmd.AddCommand(cfgListCmd, cfgAddCmd, cfgEditCmd, cfgRemoveCmd, cfgFormatCmd)
 }
 
 // RunConfigAdd is an exported function to add a host programmatically.
