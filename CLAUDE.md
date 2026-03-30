@@ -91,6 +91,10 @@ goreleaser release --clean
 - `github.com/spf13/cobra`: CLI framework
 - `fzf`: External binary (runtime dependency)
 
+## Conventions
+
+- Git commit messages and PR titles/descriptions must always be written in English.
+
 ## Important Implementation Notes
 
 - The `*` wildcard host pattern is explicitly filtered from all listings
