@@ -28,13 +28,21 @@ func GenerateIncludeFile(cache *Cache, outputPath string) error {
 		}
 
 		for _, c := range hc.Containers {
+			// Skip containers with no shell
+			if c.Shell == ShellNone {
+				continue
+			}
 			// Host line uses display name for user convenience
 			alias := hostAlias + KeySep + c.DisplayName()
 			b.WriteString(fmt.Sprintf("Host %s\n", alias))
 			// Route through the parent host — inherits all SSH config automatically
 			b.WriteString(fmt.Sprintf("    ProxyJump %s\n", hostAlias))
-			// RemoteCommand uses real Docker name, not the display alias
-			b.WriteString(fmt.Sprintf("    RemoteCommand docker exec -it %s /bin/sh\n", c.Name))
+			// Use detected shell if available, fall back to /bin/sh
+			shell := ShellSh
+			if c.Shell != "" && c.Shell != ShellNone {
+				shell = c.Shell
+			}
+			b.WriteString(fmt.Sprintf("    RemoteCommand docker exec -it %s %s\n", c.Name, shell))
 			b.WriteString("    RequestTTY yes\n")
 			b.WriteString("\n")
 		}

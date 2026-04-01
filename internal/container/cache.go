@@ -63,7 +63,7 @@ func (c *Cache) Save() error {
 	if err != nil {
 		return fmt.Errorf("marshal cache: %w", err)
 	}
-	return util.AtomicWriteFile(c.path, data, 0o644)
+	return util.AtomicWriteFile(c.path, data, 0o600)
 }
 
 // Update replaces the cached containers for a host.

@@ -21,7 +21,7 @@ func DeleteHost(hostAlias string, favStore *favorites.Store, cache *container.Ca
 				fmt.Fprintf(os.Stderr, "  • %s\n", c.DisplayName())
 			}
 			fmt.Fprintf(os.Stderr, "Remove all containers first (ctrl+d on each), then delete the host.\n")
-			return nil
+			return fmt.Errorf("host %s has %d registered container(s)", hostAlias, len(containers))
 		}
 	}
 

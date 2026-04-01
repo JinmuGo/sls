@@ -59,12 +59,14 @@ func RenameHost(hostAlias string, favStore *favorites.Store, cache *container.Ca
 			favStore.Add(newName)
 		}
 		// Also rename any container favorites
-		for _, c := range cache.GetContainers(hostAlias) {
-			oldKey := hostAlias + container.KeySep + c.Name
-			newKey := newName + container.KeySep + c.Name
-			if favStore.IsFavorite(oldKey) {
-				favStore.Remove(oldKey)
-				favStore.Add(newKey)
+		if cache != nil {
+			for _, c := range cache.GetContainers(hostAlias) {
+				oldKey := hostAlias + container.KeySep + c.Name
+				newKey := newName + container.KeySep + c.Name
+				if favStore.IsFavorite(oldKey) {
+					favStore.Remove(oldKey)
+					favStore.Add(newKey)
+				}
 			}
 		}
 	}
