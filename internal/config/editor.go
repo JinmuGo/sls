@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/jinmugo/sls/internal/consts"
+	"github.com/jinmugo/sls/internal/util"
 	sshconfig "github.com/kevinburke/ssh_config"
 )
 
@@ -54,8 +55,8 @@ func SaveAST(cfg *sshconfig.Config, path string) error {
 		}
 		buf.WriteString("\n")
 	}
-	// SSH config files should be 0600 for security
-	return os.WriteFile(path, buf.Bytes(), 0o600)
+	// SSH config files should be 0600 for security — use atomic write
+	return util.AtomicWriteFile(path, buf.Bytes(), 0o600)
 }
 
 // FormatConfig reads the SSH config file, formats it with consistent style, and writes it back.
