@@ -1,40 +1,37 @@
 package cmd
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"sort"
 	"strings"
+	"time"
 
+	"github.com/jinmugo/sls/internal/actions"
 	"github.com/jinmugo/sls/internal/cli"
 	"github.com/jinmugo/sls/internal/config"
+	"github.com/jinmugo/sls/internal/container"
 	"github.com/jinmugo/sls/internal/favorites"
+	"github.com/jinmugo/sls/internal/finder"
 	"github.com/jinmugo/sls/internal/onboarding"
-	"github.com/jinmugo/sls/internal/runner"
+	sshconfig "github.com/kevinburke/ssh_config"
 	"github.com/spf13/cobra"
 )
 
-var (
-	filterTag string
-)
+var filterTag string
 
 var rootCmd = &cobra.Command{
-	Use:   "sls",
-	Short: "ssh ls with fuzzyfinder",
+	Use:   "sls [flags] [-- extra-ssh-args...]",
+	Short: "Smart fuzzy CLI selector for SSH config hosts",
+	Long:  "sls is an interactive CLI tool for selecting and connecting to SSH hosts defined in ~/.ssh/config.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Handle --version flag
-		if versionFlag, _ := cmd.Flags().GetBool("version"); versionFlag {
-			cmd.Root().SetArgs([]string{"version"})
-			return cmd.Root().Execute()
-		}
 		return runInteractive(args)
 	},
 }
 
 func runInteractive(extraSSHArgs []string) error {
+	// Onboarding check (runs once)
 	hosts, err := config.Parse("")
 	if err != nil {
 		if errors.Is(err, config.ErrSSHDirNotExist) || errors.Is(err, config.ErrSSHConfigNotExist) {
@@ -43,70 +40,190 @@ func runInteractive(extraSSHArgs []string) error {
 				return onboardErr
 			}
 			if alias != "" {
-				if err := cli.RunConfigAdd(alias); err != nil {
-					return err
+				if addErr := cli.RunConfigAdd(alias); addErr != nil {
+					return addErr
 				}
 			}
 			if !retry {
 				return nil
 			}
-			// Re-parse after creating config
-			hosts, err = config.Parse("")
-			if err != nil {
-				return fmt.Errorf("parse ssh_config: %w", err)
-			}
 		} else {
 			return fmt.Errorf("parse ssh_config: %w", err)
 		}
 	}
+
 	if len(hosts) == 0 {
 		retry, alias, _ := onboarding.HandleEmptyConfig()
 		if alias != "" {
-			if err := cli.RunConfigAdd(alias); err != nil {
-				return err
+			if addErr := cli.RunConfigAdd(alias); addErr != nil {
+				return addErr
 			}
 		}
 		if !retry {
 			return nil
 		}
-		// Re-parse after adding first host
-		hosts, err = config.Parse("")
-		if err != nil {
-			return fmt.Errorf("parse ssh_config: %w", err)
-		}
-		if len(hosts) == 0 {
-			return nil
-		}
 	}
 
+	// Load persistent stores once
 	favStore, err := favorites.DefaultStore()
 	if err != nil {
 		return fmt.Errorf("load favorites: %w", err)
 	}
-	favMap := map[string]struct{}{}
-	favCounts := map[string]int{}
-	for _, h := range favStore.List() {
-		favMap[h] = struct{}{}
-		favCounts[h] = favStore.Count(h)
+
+	cachePath, _ := container.DefaultCachePath()
+	cache, cacheErr := container.LoadCache(cachePath)
+	var cacheWarning string
+	if cacheErr != nil {
+		cacheWarning = "⚠ Container cache unreadable"
+		cache = &container.Cache{Hosts: make(map[string]container.HostCache)}
 	}
 
+	// Track what needs reloading
+	needReloadHosts := true
+	needReloadFavs := false
+	needReloadCache := false
+
+	var statusMsg string
+	var restoreAlias string
+	hasScanned := len(cache.Hosts) > 0
+
+	// Main loop
+	for {
+		if needReloadHosts {
+			hosts, err = config.Parse("")
+			if err != nil {
+				return fmt.Errorf("parse ssh_config: %w", err)
+			}
+			needReloadHosts = false
+		}
+		if needReloadFavs {
+			favStore, _ = favorites.DefaultStore()
+			needReloadFavs = false
+		}
+		if needReloadCache {
+			cache, _ = container.LoadCache(cachePath)
+			needReloadCache = false
+		}
+
+		items, hostCount, containerCount := buildItems(hosts, favStore, cache)
+
+		opts := finder.SelectOpts{
+			StatusMsg:      statusMsg,
+			RestoreAlias:   restoreAlias,
+			HostCount:      hostCount,
+			ContainerCount: containerCount,
+			HasScanned:     hasScanned,
+		}
+		if cacheWarning != "" {
+			opts.StatusMsg = cacheWarning
+			cacheWarning = "" // show once
+		}
+
+		result, err := finder.Select(items, opts)
+		if err != nil {
+			return err
+		}
+		if result.Alias == "" {
+			return nil // esc/ctrl+c
+		}
+
+		statusMsg = ""
+		restoreAlias = result.Alias
+
+		switch result.Action {
+		case "connect":
+			return actions.Connect(result.Alias, extraSSHArgs, favStore, cache)
+
+		case "rename":
+			if strings.Contains(result.Alias, container.KeySep) {
+				parts := strings.SplitN(result.Alias, container.KeySep, 2)
+				newName, renameErr := actions.RenameContainer(cache, parts[0], parts[1])
+				if renameErr != nil {
+					statusMsg = finder.StyleError.Render("  ✗ " + renameErr.Error())
+				} else if newName != "" {
+					statusMsg = finder.StyleSuccess.Render("  ✓ Renamed → " + newName)
+					needReloadCache = true
+				}
+			} else {
+				newName, renameErr := actions.RenameHost(result.Alias, favStore, cache)
+				if renameErr != nil {
+					statusMsg = finder.StyleError.Render("  ✗ " + renameErr.Error())
+				} else if newName != "" {
+					statusMsg = finder.StyleSuccess.Render("  ✓ Renamed → " + newName)
+					restoreAlias = newName
+					needReloadHosts = true
+					needReloadFavs = true
+					needReloadCache = true
+				}
+			}
+
+		case "scan":
+			count, scanErr := actions.Scan(result.Alias, cache, 10*time.Second)
+			if scanErr != nil {
+				statusMsg = finder.StyleError.Render("  ✗ Scan failed: " + scanErr.Error())
+			} else if count == 0 {
+				statusMsg = finder.StyleDim.Render("  ○ No containers on " + result.Alias)
+			} else {
+				statusMsg = finder.StyleSuccess.Render(fmt.Sprintf("  ✓ Added %d container(s)", count))
+				hasScanned = true
+			}
+			needReloadCache = true
+
+		case "delete":
+			if strings.Contains(result.Alias, container.KeySep) {
+				parts := strings.SplitN(result.Alias, container.KeySep, 2)
+				if delErr := actions.DeleteContainer(cache, parts[0], parts[1], favStore); delErr != nil {
+					statusMsg = finder.StyleError.Render("  ✗ " + delErr.Error())
+				} else {
+					statusMsg = finder.StyleSuccess.Render("  ✓ Deleted " + parts[1])
+					restoreAlias = parts[0]
+					needReloadCache = true
+				}
+			} else {
+				if delErr := actions.DeleteHost(result.Alias, favStore, cache); delErr != nil {
+					statusMsg = finder.StyleError.Render("  ✗ " + delErr.Error())
+				} else {
+					statusMsg = finder.StyleSuccess.Render("  ✓ Deleted " + result.Alias)
+					restoreAlias = ""
+					needReloadHosts = true
+					needReloadFavs = true
+				}
+			}
+
+		case "star":
+			if starErr := actions.Star(favStore, result.Alias); starErr != nil {
+				statusMsg = finder.StyleError.Render("  ✗ " + starErr.Error())
+			} else {
+				if favStore.IsFavorite(result.Alias) {
+					statusMsg = finder.StyleSuccess.Render("  ✓ Starred " + result.Alias)
+				} else {
+					statusMsg = finder.StyleSuccess.Render("  ✓ Unstarred " + result.Alias)
+				}
+				needReloadFavs = true
+			}
+		}
+	}
+}
+
+// buildItems constructs the sorted item list for the finder.
+func buildItems(hosts []*sshconfig.Host, favStore *favorites.Store, cache *container.Cache) ([]finder.Item, int, int) {
 	var favAliases []string
 	var normalAliases []struct {
 		Alias string
 		Count int
 	}
+
 	for _, h := range hosts {
-		if len(h.Patterns) > 0 {
-			pat := h.Patterns[0].String()
+		for _, p := range h.Patterns {
+			pat := p.String()
 			if pat == "*" {
 				continue
 			}
-			// Filter by tag if specified
 			if filterTag != "" && !favStore.HasTag(pat, filterTag) {
 				continue
 			}
 			if favStore.IsFavorite(pat) {
-				favAliases = append(favAliases, "⭐︎"+pat)
+				favAliases = append(favAliases, pat)
 			} else {
 				normalAliases = append(normalAliases, struct {
 					Alias string
@@ -115,73 +232,91 @@ func runInteractive(extraSSHArgs []string) error {
 			}
 		}
 	}
-
 	sort.SliceStable(normalAliases, func(i, j int) bool {
 		return normalAliases[i].Count > normalAliases[j].Count
 	})
 
-	var aliases []string
-	aliases = append(aliases, favAliases...)
-	for _, n := range normalAliases {
-		aliases = append(aliases, n.Alias)
+	hostCount := len(favAliases) + len(normalAliases)
+	containerCount := 0
+
+	// Favorited containers at top level
+	favContainerSet := make(map[string]bool)
+	var favContainerItems []finder.Item
+	if cache != nil {
+		for hostAlias, hc := range cache.Hosts {
+			for _, c := range hc.Containers {
+				key := hostAlias + container.KeySep + c.Name
+				if favStore.IsFavorite(key) {
+					favContainerSet[key] = true
+					favContainerItems = append(favContainerItems, finder.Item{
+						Label: "⭐︎" + containerLabel(c, ""),
+						Alias: key,
+					})
+					containerCount++
+				}
+			}
+		}
 	}
 
-	// Check if fzf is available
-	if _, err := exec.LookPath("fzf"); err != nil {
-		return fmt.Errorf("fzf not found in PATH. Please install fzf: https://github.com/junegunn/fzf")
-	}
-
-	fzfArgs := []string{"--prompt", "sls > ", "--preview", "sls preview {}"}
-	if !hasUserFzfConfig() {
-		fzfArgs = append(fzfArgs,
-			"--height", "~50%",
-			"--layout", "reverse",
-		)
-	}
-
-	fzf := exec.Command("fzf", fzfArgs...)
-	fzf.Stdin = strings.NewReader(strings.Join(aliases, "\n"))
-
-	var out bytes.Buffer
-	fzf.Stdout = &out
-	fzf.Stderr = os.Stderr
-
-	if err := fzf.Run(); err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() > 0 {
+	// Nested containers per host
+	containerItems := func(hostAlias string) []finder.Item {
+		if cache == nil {
 			return nil
 		}
-		return fmt.Errorf("fzf: %w", err)
+		containers := cache.GetContainers(hostAlias)
+		if len(containers) == 0 {
+			return nil
+		}
+		staleTag := ""
+		if cache.IsStale(hostAlias, 1*time.Hour) {
+			staleTag = " (stale)"
+		}
+		var items []finder.Item
+		for _, c := range containers {
+			key := hostAlias + container.KeySep + c.Name
+			if favContainerSet[key] {
+				continue
+			}
+			items = append(items, finder.Item{
+				Label:    containerLabel(c, staleTag),
+				Alias:    key,
+				IsNested: true,
+			})
+			containerCount++
+		}
+		if len(items) > 0 {
+			items[len(items)-1].IsLast = true
+		}
+		return items
 	}
 
-	choice := strings.TrimSpace(out.String())
-	if choice == "" {
-		return nil
+	var items []finder.Item
+	items = append(items, favContainerItems...)
+	for _, alias := range favAliases {
+		items = append(items, finder.Item{Label: "⭐︎" + alias, Alias: alias})
+		items = append(items, containerItems(alias)...)
 	}
-	choice = strings.TrimPrefix(choice, "⭐︎")
-
-	if err := favStore.Increment(choice); err != nil {
-		// Don't fail on increment error, just log to stderr
-		fmt.Fprintf(os.Stderr, "Warning: failed to update usage count: %v\n", err)
+	for _, n := range normalAliases {
+		items = append(items, finder.Item{Label: n.Alias, Alias: n.Alias})
+		items = append(items, containerItems(n.Alias)...)
 	}
 
-	return runner.SSH(choice, extraSSHArgs)
+	return items, hostCount, containerCount
 }
 
-func hasUserFzfConfig() bool {
-	if os.Getenv("FZF_DEFAULT_OPTS") != "" {
-		return true
+// containerLabel builds the display label for a container in the finder list.
+// e.g., "nginx 🐳", "nginx 🐳 (bash)", "nginx 🐳 (no shell)", "nginx 🐳 (stale)"
+func containerLabel(c container.Container, suffix string) string {
+	label := c.DisplayName() + " 🐳"
+	if sl := c.ShellLabel(); sl != "" {
+		label += " (" + sl + ")"
 	}
-	if optsFile := os.Getenv("FZF_DEFAULT_OPTS_FILE"); optsFile != "" {
-		if _, err := os.Stat(optsFile); err == nil {
-			return true
-		}
-	}
-	return false
+	label += suffix
+	return label
 }
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 }
@@ -192,8 +327,9 @@ func init() {
 	rootCmd.AddCommand(cli.TagCmd)
 	rootCmd.AddCommand(cli.TestCmd)
 	rootCmd.AddCommand(cli.CompletionCmd)
-	rootCmd.AddCommand(cli.PreviewCmd)
+	rootCmd.AddCommand(cli.DiscoverCmd)
+	rootCmd.AddCommand(cli.ConnectCmd)
+	rootCmd.AddCommand(cli.GenCmd)
 
-	// Add --tag flag for filtering hosts by tag
 	rootCmd.Flags().StringVarP(&filterTag, "tag", "t", "", "Filter hosts by tag")
 }
