@@ -97,11 +97,11 @@ func (m renameModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.input = m.input[:len(m.input)-1]
 				m.errMsg = ""
 			}
-		case "ctrl+u":
+		case "ctrl+l":
 			m.input = ""
 			m.errMsg = ""
 		default:
-			if len(msg.String()) == 1 {
+			if len(msg.String()) == 1 && msg.String()[0] >= 0x20 {
 				m.input += msg.String()
 				m.errMsg = ""
 			}
@@ -119,16 +119,16 @@ func (m renameModel) View() string {
 	progress := StyleDim.Render(fmt.Sprintf("[%d/%d]", m.current+1, len(m.items)))
 	info := StyleDim.Render(item.DisplayInfo)
 
-	label := fmt.Sprintf("%s %s %s", progress, info, StylePromptBold.Render("name:"))
-	input := StyleInput.Render(m.input) + "█"
+	header := fmt.Sprintf("%s %s", progress, info)
+	prompt := fmt.Sprintf("  %s %s", StylePromptBold.Render("name:"), StyleInput.Render(m.input)+"█")
 
-	result := label + " " + input
+	result := header + "\n" + prompt
 
 	if m.errMsg != "" {
 		result += "\n" + StyleError.Render("  ✗ "+m.errMsg)
 	}
 
-	help := StyleDim.Render("  enter confirm · ctrl+u clear · esc cancel")
+	help := StyleDim.Render("  enter confirm · ctrl+l clear · esc cancel")
 
 	return result + "\n" + help
 }
