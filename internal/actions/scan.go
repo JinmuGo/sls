@@ -25,26 +25,30 @@ func Scan(hostAlias string, cache *container.Cache, timeout time.Duration) (int,
 
 	fmt.Fprintf(os.Stderr, "Found %d container(s). Select which ones to add:\n", len(containers))
 
-	// Pre-check containers that were previously selected for this host
+	// Exclude containers that are already registered for this host
 	existing := cache.GetContainers(hostAlias)
 	existingSet := make(map[string]bool, len(existing))
 	for _, c := range existing {
 		existingSet[c.Name] = true
 	}
 
-	selectItems := make([]finder.Item, len(containers))
-	var preChecked []string
-	for i, c := range containers {
-		selectItems[i] = finder.Item{
+	var selectItems []finder.Item
+	for _, c := range containers {
+		if existingSet[c.Name] {
+			continue
+		}
+		selectItems = append(selectItems, finder.Item{
 			Label: c.Name,
 			Alias: c.Name,
-		}
-		if existingSet[c.Name] {
-			preChecked = append(preChecked, c.Name)
-		}
+		})
 	}
 
-	selected, err := finder.SelectMulti(selectItems, "select containers", preChecked...)
+	if len(selectItems) == 0 {
+		fmt.Fprintln(os.Stderr, "All containers are already registered.")
+		return 0, nil
+	}
+
+	selected, err := finder.SelectMulti(selectItems, "select containers")
 	if err != nil {
 		return 0, err
 	}
