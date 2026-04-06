@@ -96,7 +96,8 @@ func Scan(hostAlias string, cache *container.Cache, timeout time.Duration) (int,
 		}
 	}
 
-	cache.MergeUpdate(hostAlias, picked)
+	// Append new containers to existing ones (don't replace)
+	cache.Update(hostAlias, append(cache.GetContainers(hostAlias), picked...))
 	if err := cache.Save(); err != nil {
 		return 0, fmt.Errorf("save cache: %w", err)
 	}
