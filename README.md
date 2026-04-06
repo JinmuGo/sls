@@ -3,6 +3,8 @@
 A smart terminal dashboard for SSH hosts and Docker containers.
 One command to find, connect, and manage everything you SSH into.
 
+![demo](demo.gif)
+
 ## Why sls?
 
 You have 10 servers. Some run Docker containers. To reach a container, you SSH into the server, remember the container name, then `docker exec` into it. Every time.
