@@ -15,6 +15,7 @@ import (
 	"github.com/jinmugo/sls/internal/favorites"
 	"github.com/jinmugo/sls/internal/finder"
 	"github.com/jinmugo/sls/internal/onboarding"
+	"github.com/jinmugo/sls/internal/pulse"
 	sshconfig "github.com/kevinburke/ssh_config"
 	"github.com/spf13/cobra"
 )
@@ -132,6 +133,7 @@ func runInteractive(extraSSHArgs []string) error {
 
 		switch result.Action {
 		case "connect":
+			pulse.Track("command_run", pulse.Props{"command": "connect", "target": result.Alias})
 			return actions.Connect(result.Alias, extraSSHArgs, favStore, cache)
 
 		case "rename":
@@ -158,6 +160,7 @@ func runInteractive(extraSSHArgs []string) error {
 			}
 
 		case "scan":
+			pulse.Track("command_run", pulse.Props{"command": "scan", "target": result.Alias})
 			count, scanErr := actions.Scan(result.Alias, cache, 10*time.Second)
 			if scanErr != nil {
 				statusMsg = finder.StyleError.Render("  ✗ Scan failed: " + scanErr.Error())
@@ -316,6 +319,9 @@ func containerLabel(c container.Container, suffix string) string {
 }
 
 func Execute() {
+	pulse.Init(version)
+	defer pulse.Shutdown()
+
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
