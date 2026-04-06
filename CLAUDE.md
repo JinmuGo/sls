@@ -113,6 +113,17 @@ goreleaser release --clean
 - `github.com/spf13/cobra`: CLI framework
 - `golang.org/x/sync`: Concurrent container discovery
 
+## Collaboration Rules
+
+- All changes go through PRs — no direct push to `main`
+- External PRs require owner approval (1 review minimum)
+- Owner (admin) can merge own PRs without external review
+- Squash merge only — one commit per PR, clean linear history
+- Stale approvals are dismissed on new pushes
+- PR branches auto-deleted after merge
+- PR titles follow conventional commits: `feat:`, `fix:`, `docs:`, `refactor:`, `chore:`
+- Use `/ship` skill to create PRs
+
 ## Conventions
 
 - Git commit messages and PR titles/descriptions must always be written in English.
