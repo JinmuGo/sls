@@ -48,17 +48,17 @@ brew install sls
 ### Debian/Ubuntu (apt)
 
 ```bash
-curl -fsSL https://package.jinmu.me/gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/sls.gpg
-echo "deb [signed-by=/etc/apt/keyrings/sls.gpg] https://package.jinmu.me/deb stable main" | sudo tee /etc/apt/sources.list.d/sls.list
+curl -fsSL https://package.jinmu.me/gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/jinmugo.gpg
+echo "deb [signed-by=/etc/apt/keyrings/jinmugo.gpg] https://package.jinmu.me/deb stable main" | sudo tee /etc/apt/sources.list.d/jinmugo.list
 sudo apt update && sudo apt install sls
 ```
 
 ### Fedora/RHEL (dnf/yum)
 
 ```bash
-sudo tee /etc/yum.repos.d/sls.repo << EOF
-[sls]
-name=sls
+sudo tee /etc/yum.repos.d/jinmugo.repo << EOF
+[jinmugo]
+name=jinmugo
 baseurl=https://package.jinmu.me/rpm
 enabled=1
 gpgcheck=1
