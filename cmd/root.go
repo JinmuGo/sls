@@ -133,7 +133,7 @@ func runInteractive(extraSSHArgs []string) error {
 
 		switch result.Action {
 		case "connect":
-			pulse.Track("command_run", pulse.Props{"command": "connect", "target": result.Alias})
+			pulse.Track("command_run", pulse.Props{"command": "connect"})
 			return actions.Connect(result.Alias, extraSSHArgs, favStore, cache)
 
 		case "rename":
@@ -160,7 +160,7 @@ func runInteractive(extraSSHArgs []string) error {
 			}
 
 		case "scan":
-			pulse.Track("command_run", pulse.Props{"command": "scan", "target": result.Alias})
+			pulse.Track("command_run", pulse.Props{"command": "scan"})
 			count, scanErr := actions.Scan(result.Alias, cache, 10*time.Second)
 			if scanErr != nil {
 				statusMsg = finder.StyleError.Render("  ✗ Scan failed: " + scanErr.Error())
