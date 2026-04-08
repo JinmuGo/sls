@@ -7,11 +7,12 @@ import (
 	"github.com/jinmugo/sls/internal/config"
 	"github.com/jinmugo/sls/internal/container"
 	"github.com/jinmugo/sls/internal/favorites"
+	"github.com/jinmugo/sls/internal/hostinfo"
 )
 
 // DeleteHost removes a host from SSH config, cleaning up favorites.
 // Returns an error if the host has registered containers (must be removed first).
-func DeleteHost(hostAlias string, favStore *favorites.Store, cache *container.Cache) error {
+func DeleteHost(hostAlias string, favStore *favorites.Store, cache *container.Cache, infoCache ...*hostinfo.Cache) error {
 	// Check if host has containers
 	if cache != nil {
 		containers := cache.GetContainers(hostAlias)
@@ -42,6 +43,12 @@ func DeleteHost(hostAlias string, favStore *favorites.Store, cache *container.Ca
 	// Clean up favorites
 	if favStore != nil {
 		favStore.Remove(hostAlias)
+	}
+
+	// Clean up hostinfo cache
+	if len(infoCache) > 0 && infoCache[0] != nil {
+		infoCache[0].DeleteHost(hostAlias)
+		infoCache[0].Save()
 	}
 
 	fmt.Fprintf(os.Stderr, "✓ Deleted host \033[31m%s\033[0m from SSH config\n", hostAlias)

@@ -35,4 +35,7 @@ var (
 	StyleCheck     = lipgloss.NewStyle().Foreground(SuccessColor)
 	StyleUncheck   = lipgloss.NewStyle().Foreground(DimColor)
 	StyleInput     = lipgloss.NewStyle().Foreground(lipgloss.Color("7"))
+	StylePreviewBorder = lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(DimColor)
 )

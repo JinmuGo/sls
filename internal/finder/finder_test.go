@@ -1,9 +1,12 @@
 package finder
 
 import (
+	"context"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/jinmugo/sls/internal/hostinfo"
 )
 
 func TestTruncatePlain(t *testing.T) {
@@ -255,5 +258,189 @@ func TestModelEsc(t *testing.T) {
 	result := updated.(model)
 	if !result.cancelled {
 		t.Error("expected cancelled after esc")
+	}
+}
+
+func TestModelTabToggle(t *testing.T) {
+	items := []Item{
+		{Label: "server", Alias: "server"},
+	}
+
+	t.Run("tab ignored without fetcher", func(t *testing.T) {
+		m := newModel(items, SelectOpts{})
+		m.width = 120
+		m.height = 30
+
+		updated, _ := m.Update(makeKeyMsg("tab"))
+		result := updated.(model)
+		if result.previewOpen {
+			t.Error("preview should not open without fetcher")
+		}
+	})
+
+	t.Run("tab ignored on narrow terminal", func(t *testing.T) {
+		m := newModel(items, SelectOpts{InfoFetcher: &mockFetcher{}})
+		m.width = 80
+		m.height = 30
+
+		updated, _ := m.Update(makeKeyMsg("tab"))
+		result := updated.(model)
+		if result.previewOpen {
+			t.Error("preview should not open on narrow terminal")
+		}
+	})
+
+	t.Run("tab toggles on wide terminal with fetcher", func(t *testing.T) {
+		m := newModel(items, SelectOpts{InfoFetcher: &mockFetcher{}})
+		m.width = 120
+		m.height = 30
+
+		updated, _ := m.Update(makeKeyMsg("tab"))
+		result := updated.(model)
+		if !result.previewOpen {
+			t.Error("expected preview to open")
+		}
+
+		updated2, _ := result.Update(makeKeyMsg("tab"))
+		result2 := updated2.(model)
+		if result2.previewOpen {
+			t.Error("expected preview to close on second tab")
+		}
+	})
+}
+
+func TestCursorHost(t *testing.T) {
+	items := []Item{
+		{Label: "server", Alias: "server"},
+		{Label: "⭐︎nginx", Alias: "server::nginx"},
+		{Label: "staging", Alias: "staging"},
+	}
+	m := newModel(items, SelectOpts{})
+
+	m.cursor = 0
+	if got := m.cursorHost(); got != "server" {
+		t.Errorf("cursor 0: got %q, want server", got)
+	}
+
+	m.cursor = 1
+	if got := m.cursorHost(); got != "server" {
+		t.Errorf("cursor 1: got %q, want server (parent of container)", got)
+	}
+
+	m.cursor = 2
+	if got := m.cursorHost(); got != "staging" {
+		t.Errorf("cursor 2: got %q, want staging", got)
+	}
+}
+
+func TestCtrlSBlockedOnContainer(t *testing.T) {
+	items := []Item{
+		{Label: "⭐︎nginx", Alias: "server::nginx"}, // favorited container, IsNested=false
+	}
+	m := newModel(items, SelectOpts{})
+	m.cursor = 0
+
+	updated, _ := m.Update(makeKeyMsg("ctrl+s"))
+	result := updated.(model)
+	if result.action == "scan" {
+		t.Error("ctrl+s should not trigger scan on container (:: check)")
+	}
+}
+
+// mockFetcher implements HostInfoFetcher for testing.
+type mockFetcher struct{}
+
+func (f *mockFetcher) Get(host string) *hostinfo.HostInfo { return nil }
+func (f *mockFetcher) FetchAsync(ctx context.Context, host string) (*hostinfo.HostInfo, error) {
+	return &hostinfo.HostInfo{Hostname: host}, nil
+}
+
+func TestPreviewViewConsistency(t *testing.T) {
+	items := []Item{
+		{Label: "⭐︎ jgopi", Alias: "jgopi"},
+		{Label: "proxmox", Alias: "proxmox"},
+		{Label: "frontend 🐢 (stale)", Alias: "jgopi::frontend", IsNested: true},
+		{Label: "oci_atlas_1", Alias: "oci_atlas_1"},
+		{Label: "backend 🐢 (stale)", Alias: "oci_atlas_1::backend", IsNested: true, IsLast: true},
+		{Label: "RockyLinux", Alias: "RockyLinux"},
+		{Label: "HomeServer", Alias: "HomeServer"},
+		{Label: "readup-old", Alias: "readup-old"},
+	}
+
+	widths := []int{100, 120, 150, 200}
+
+	for _, w := range widths {
+		m := newModel(items, SelectOpts{
+			HostCount:      5,
+			ContainerCount: 2,
+			InfoFetcher:    &mockFetcher{},
+		})
+		m.width = w
+		m.height = 30
+		m.previewOpen = true
+		m.recalcWidths()
+
+		// Verify consistent line count across all cursor positions
+		var prevLineCount int
+		for cursor := 0; cursor < len(items); cursor++ {
+			m.cursor = cursor
+			output := m.View()
+			lines := strings.Split(output, "\n")
+
+			if cursor == 0 {
+				prevLineCount = len(lines)
+			}
+
+			if len(lines) != prevLineCount {
+				t.Errorf("width=%d cursor=%d: line count changed from %d to %d",
+					w, cursor, prevLineCount, len(lines))
+			}
+
+			if len(lines) != 30 {
+				t.Errorf("width=%d cursor=%d: expected 30 lines, got %d",
+					w, cursor, len(lines))
+			}
+		}
+	}
+}
+
+func TestPreviewViewStructure(t *testing.T) {
+	items := []Item{
+		{Label: "server", Alias: "server"},
+		{Label: "container", Alias: "server::container", IsNested: true, IsLast: true},
+	}
+
+	m := newModel(items, SelectOpts{
+		HostCount:   1,
+		InfoFetcher: &mockFetcher{},
+	})
+	m.width = 120
+	m.height = 20
+	m.previewOpen = true
+	m.recalcWidths()
+
+	output := m.View()
+	lines := strings.Split(output, "\n")
+
+	// Line count must match paneH
+	if len(lines) != 20 {
+		t.Errorf("expected 20 lines, got %d", len(lines))
+	}
+
+	// First line must contain top border
+	if !strings.Contains(lines[0], "╭") || !strings.Contains(lines[0], "╮") {
+		t.Error("first line missing top border ╭...╮")
+	}
+
+	// Last line must contain bottom border
+	if !strings.Contains(lines[len(lines)-1], "╰") || !strings.Contains(lines[len(lines)-1], "╯") {
+		t.Error("last line missing bottom border ╰...╯")
+	}
+
+	// Middle lines must contain side borders
+	for i := 1; i < len(lines)-1; i++ {
+		if !strings.Contains(lines[i], "│") {
+			t.Errorf("line %d missing side border │", i)
+		}
 	}
 }

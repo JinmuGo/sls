@@ -1,13 +1,15 @@
 package finder
 
 import (
+	"context"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/jinmugo/sls/internal/hostinfo"
 	"github.com/sahilm/fuzzy"
 )
 
@@ -25,13 +27,24 @@ type SelectResult struct {
 	Action string // "connect", "rename", "scan", "delete", "star"
 }
 
+// HostInfoFetcher fetches system info for a host. Injected to keep finder
+// decoupled from SSH and caching concerns.
+type HostInfoFetcher interface {
+	// Get returns cached info for a host, or nil if not available.
+	Get(host string) *hostinfo.HostInfo
+	// FetchAsync starts a background fetch. The result is delivered via tea.Cmd.
+	FetchAsync(ctx context.Context, host string) (*hostinfo.HostInfo, error)
+}
+
 // SelectOpts configures the finder behavior.
 type SelectOpts struct {
-	StatusMsg   string // temporary status message (e.g., "✓ Starred prod")
-	RestoreAlias string // alias to restore cursor to after rebuild
-	HostCount   int    // number of hosts (for header)
-	ContainerCount int // number of containers (for header)
-	HasScanned  bool   // true if user has ever scanned (hides first-run hint)
+	StatusMsg      string           // temporary status message (e.g., "✓ Starred prod")
+	RestoreAlias   string           // alias to restore cursor to after rebuild
+	HostCount      int              // number of hosts (for header)
+	ContainerCount int              // number of containers (for header)
+	HasScanned     bool             // true if user has ever scanned (hides first-run hint)
+	InfoFetcher    HostInfoFetcher  // optional: provides host info for preview panel
+	InfoCache      *hostinfo.Cache  // optional: disk cache for persistence across sessions
 }
 
 // Select launches the interactive finder TUI and returns the selected item's alias.
@@ -42,15 +55,24 @@ func Select(items []Item, opts SelectOpts) (SelectResult, error) {
 	}
 
 	m := newModel(items, opts)
-	p := tea.NewProgram(m)
+	p := tea.NewProgram(m, tea.WithAltScreen())
 	finalModel, err := p.Run()
 	if err != nil {
 		return SelectResult{}, fmt.Errorf("finder: %w", err)
 	}
 
-	fmt.Fprint(os.Stderr, "\033[A\033[K")
-
 	result := finalModel.(model)
+
+	// Flush in-memory cache to disk on exit
+	if result.infoCache != nil && result.infoDirty {
+		_ = result.infoCache.Save()
+	}
+
+	// Cancel any in-flight fetch
+	if result.cancelFetch != nil {
+		result.cancelFetch()
+	}
+
 	if result.cancelled {
 		return SelectResult{}, nil
 	}
@@ -74,6 +96,21 @@ type model struct {
 	hostCount      int
 	containerCount int
 	hasScanned     bool
+
+	// Preview panel
+	previewOpen   bool
+	infoFetcher   HostInfoFetcher
+	infoCache     *hostinfo.Cache
+	infoDirty     bool                       // true if cache was updated (needs flush)
+	infoMem       map[string]*hostinfo.HostInfo // in-memory cache for current session
+	loadingHost   string
+	fetchGen      uint64
+	cancelFetch   context.CancelFunc
+	listWidth     int
+	previewWidth  int
+	fetchDebounce *time.Timer
+	saveDebounce  *time.Timer
+	prevCursorHost string // track cursor host to detect changes
 }
 
 type filteredItem struct {
@@ -84,13 +121,40 @@ type filteredItem struct {
 // clearStatusMsg is sent after the status flash expires.
 type clearStatusMsg struct{}
 
+// hostInfoMsg delivers async SSH fetch results.
+type hostInfoMsg struct {
+	host string
+	info *hostinfo.HostInfo
+	gen  uint64
+}
+
+// fetchDebounceMsg triggers a debounced fetch.
+type fetchDebounceMsg struct {
+	host string
+	gen  uint64
+}
+
+// saveDebounceMsg triggers a debounced cache save.
+type saveDebounceMsg struct{}
+
 func newModel(items []Item, opts SelectOpts) model {
 	m := model{
 		items:          items,
 		hostCount:      opts.HostCount,
 		containerCount: opts.ContainerCount,
 		hasScanned:     opts.HasScanned,
+		infoFetcher:    opts.InfoFetcher,
+		infoCache:      opts.InfoCache,
+		infoMem:        make(map[string]*hostinfo.HostInfo),
 	}
+
+	// Pre-load disk cache into memory
+	if m.infoCache != nil {
+		for k, v := range m.infoCache.Hosts {
+			m.infoMem[k] = v
+		}
+	}
+
 	if opts.StatusMsg != "" {
 		m.statusMsg = opts.StatusMsg
 		m.statusExpiry = time.Now().Add(2 * time.Second)
@@ -151,6 +215,33 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusMsg = ""
 		return m, nil
 
+	case hostInfoMsg:
+		if msg.gen != m.fetchGen {
+			return m, nil // stale result
+		}
+		m.loadingHost = ""
+		m.infoMem[msg.host] = msg.info
+		if m.infoCache != nil {
+			m.infoCache.Set(msg.host, msg.info)
+			m.infoDirty = true
+			// Debounced save: 500ms
+			return m, tea.Tick(500*time.Millisecond, func(time.Time) tea.Msg { return saveDebounceMsg{} })
+		}
+		return m, nil
+
+	case fetchDebounceMsg:
+		if msg.gen != m.fetchGen {
+			return m, nil // stale debounce
+		}
+		return m, m.doFetch(msg.host)
+
+	case saveDebounceMsg:
+		if m.infoCache != nil && m.infoDirty {
+			_ = m.infoCache.Save()
+			m.infoDirty = false
+		}
+		return m, nil
+
 	case tea.KeyMsg:
 		// Delete confirmation mode — only y/n/esc accepted
 		if m.confirmDelete {
@@ -177,6 +268,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.quitting = true
 			return m, tea.Quit
+		case "tab":
+			if m.width >= 100 && m.infoFetcher != nil {
+				m.previewOpen = !m.previewOpen
+				m.recalcWidths()
+				if m.previewOpen {
+					return m, m.triggerPreviewFetch()
+				}
+			}
 		case "ctrl+r":
 			if len(m.filtered) > 0 && m.cursor < len(m.filtered) {
 				m.selected = m.filtered[m.cursor].item.Alias
@@ -188,7 +287,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Scan: only on SSH hosts (no ::)
 			if len(m.filtered) > 0 && m.cursor < len(m.filtered) {
 				alias := m.filtered[m.cursor].item.Alias
-				if !m.filtered[m.cursor].item.IsNested {
+				if !m.filtered[m.cursor].item.IsNested && !strings.Contains(alias, "::") {
 					m.selected = alias
 					m.action = "scan"
 					m.quitting = true
@@ -210,29 +309,133 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "up", "ctrl+p", "ctrl+k":
 			if m.cursor > 0 {
 				m.cursor--
+				if m.previewOpen {
+					return m, m.triggerPreviewFetch()
+				}
 			}
 		case "down", "ctrl+n", "ctrl+j":
 			if m.cursor < len(m.filtered)-1 {
 				m.cursor++
+				if m.previewOpen {
+					return m, m.triggerPreviewFetch()
+				}
 			}
 		case "backspace":
 			if len(m.query) > 0 {
 				m.query = m.query[:len(m.query)-1]
 				m.filter()
 				m.cursor = 0
+				if m.previewOpen {
+					return m, m.triggerPreviewFetch()
+				}
 			}
 		default:
 			if len(msg.String()) == 1 {
 				m.query += msg.String()
 				m.filter()
 				m.cursor = 0
+				if m.previewOpen {
+					return m, m.triggerPreviewFetch()
+				}
 			}
 		}
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		if m.previewOpen && m.width < 100 {
+			m.previewOpen = false
+		}
+		m.recalcWidths()
 	}
 	return m, nil
+}
+
+// cursorHost returns the SSH host alias for the current cursor position.
+// For containers (alias contains "::"), returns the parent host.
+func (m model) cursorHost() string {
+	if m.cursor >= len(m.filtered) {
+		return ""
+	}
+	alias := m.filtered[m.cursor].item.Alias
+	if idx := strings.Index(alias, "::"); idx != -1 {
+		return alias[:idx]
+	}
+	return alias
+}
+
+// triggerPreviewFetch starts a debounced fetch for the current cursor's host.
+func (m *model) triggerPreviewFetch() tea.Cmd {
+	host := m.cursorHost()
+	if host == "" {
+		return nil
+	}
+
+	// Check in-memory cache first (no debounce needed)
+	if info, ok := m.infoMem[host]; ok {
+		ttl := hostinfo.DefaultTTL
+		if info.Error != "" {
+			ttl = hostinfo.ErrorTTL
+		}
+		if time.Since(info.FetchedAt) <= ttl {
+			m.loadingHost = ""
+			m.prevCursorHost = host
+			return nil
+		}
+	}
+
+	// Same host as before — already fetching
+	if host == m.prevCursorHost && m.loadingHost == host {
+		return nil
+	}
+	m.prevCursorHost = host
+
+	// Cancel previous fetch
+	if m.cancelFetch != nil {
+		m.cancelFetch()
+		m.cancelFetch = nil
+	}
+
+	m.fetchGen++
+	m.loadingHost = host
+	gen := m.fetchGen
+
+	// 200ms debounce
+	return tea.Tick(200*time.Millisecond, func(time.Time) tea.Msg {
+		return fetchDebounceMsg{host: host, gen: gen}
+	})
+}
+
+// doFetch starts the actual SSH fetch.
+func (m *model) doFetch(host string) tea.Cmd {
+	if m.infoFetcher == nil {
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	m.cancelFetch = cancel
+	gen := m.fetchGen
+
+	return func() tea.Msg {
+		info, _ := m.infoFetcher.FetchAsync(ctx, host)
+		if info == nil {
+			info = &hostinfo.HostInfo{
+				Hostname:  host,
+				Error:     "fetch failed",
+				FetchedAt: time.Now(),
+			}
+		}
+		return hostInfoMsg{host: host, info: info, gen: gen}
+	}
+}
+
+func (m *model) recalcWidths() {
+	if m.previewOpen && m.width >= 100 {
+		m.listWidth = m.width * 60 / 100
+		m.previewWidth = m.width - m.listWidth
+	} else {
+		m.listWidth = m.width
+		m.previewWidth = 0
+	}
 }
 
 func (m model) View() string {
@@ -260,6 +463,11 @@ func (m model) View() string {
 	}
 	hintLines := 1
 
+	effectiveWidth := m.width
+	if m.previewOpen && m.listWidth > 0 {
+		effectiveWidth = m.listWidth
+	}
+
 	listHeight := len(m.filtered)
 	if m.height > 0 && listHeight > m.height-headerLines-hintLines {
 		listHeight = m.height - headerLines - hintLines
@@ -283,8 +491,8 @@ func (m model) View() string {
 
 	// Render lines
 	maxLabel := 60
-	if m.width > 0 {
-		maxLabel = m.width - 4
+	if effectiveWidth > 0 {
+		maxLabel = effectiveWidth - 4
 	}
 
 	var lines []string
@@ -325,7 +533,82 @@ func (m model) View() string {
 	// Hint bar
 	hint := m.buildHintBar()
 
-	return header + "\n" + strings.Join(lines, "\n") + hint
+	listContent := header + "\n" + strings.Join(lines, "\n") + hint
+
+	// Split-pane with preview (fzf-style line-by-line rendering)
+	if m.previewOpen && m.previewWidth > 0 {
+		host := m.cursorHost()
+		var info *hostinfo.HostInfo
+		loading := false
+		if host != "" {
+			if cached, ok := m.infoMem[host]; ok {
+				info = cached
+			}
+			if info == nil && m.loadingHost == host {
+				loading = true
+			}
+		}
+
+		paneH := m.height
+		if paneH <= 0 {
+			paneH = 24
+		}
+
+		innerW := m.previewWidth - 4 // 2 border + 2 visual padding
+		if innerW < 1 {
+			innerW = 1
+		}
+		pvLines := previewLines(info, loading, innerW)
+
+		listLines := strings.Split(listContent, "\n")
+
+		borderStyle := lipgloss.NewStyle().Foreground(DimColor)
+		hBar := strings.Repeat("─", m.previewWidth-2)
+		borderL := borderStyle.Render("│")
+		borderR := borderStyle.Render("│")
+
+		// Column where the preview pane starts (1-based for ANSI CHA)
+		previewCol := m.listWidth + 1
+
+		var out strings.Builder
+		for i := 0; i < paneH; i++ {
+			if i > 0 {
+				out.WriteByte('\n')
+			}
+
+			// Left: list content (no padding — cursor positioning handles alignment)
+			if i < len(listLines) {
+				out.WriteString(listLines[i])
+			}
+
+			// Clear stale content between left end and preview border
+			out.WriteString("\x1b[K")
+
+			// Move cursor to preview column
+			fmt.Fprintf(&out, "\x1b[%dG", previewCol)
+
+			// Right: preview pane with border
+			switch {
+			case i == 0:
+				out.WriteString(borderStyle.Render("╭" + hBar + "╮"))
+			case i == paneH-1:
+				out.WriteString(borderStyle.Render("╰" + hBar + "╯"))
+			default:
+				contentIdx := i - 1
+				content := ""
+				if contentIdx < len(pvLines) {
+					content = pvLines[contentIdx]
+				}
+				out.WriteString(borderL)
+				out.WriteString(padRight(content, m.previewWidth-2))
+				out.WriteString(borderR)
+			}
+		}
+
+		return out.String()
+	}
+
+	return listContent
 }
 
 func (m model) buildHintBar() string {
@@ -339,6 +622,9 @@ func (m model) buildHintBar() string {
 	}
 
 	w := m.width
+	if m.previewOpen && m.listWidth > 0 {
+		w = m.listWidth
+	}
 	if w <= 0 {
 		w = 80
 	}
@@ -350,8 +636,11 @@ func (m model) buildHintBar() string {
 
 	isContainer := false
 	if m.cursor < len(m.filtered) {
-		isContainer = m.filtered[m.cursor].item.IsNested
+		isContainer = m.filtered[m.cursor].item.IsNested ||
+			strings.Contains(m.filtered[m.cursor].item.Alias, "::")
 	}
+
+	canPreview := m.infoFetcher != nil && w >= 100
 
 	if w < 60 {
 		// Minimal hints for narrow terminals
@@ -366,11 +655,20 @@ func (m model) buildHintBar() string {
 		return "\n" + StyleDim.Render("  ⏎ connect · ^s scan · ^r rename · ^f star · esc")
 	}
 
+	previewHint := ""
+	if canPreview {
+		if m.previewOpen {
+			previewHint = " · tab close"
+		} else {
+			previewHint = " · tab preview"
+		}
+	}
+
 	// Full hints
 	if isContainer {
-		return "\n" + StyleDim.Render("  ^j/k up/down · enter connect · ^r rename · ^f star · ^d delete · esc quit")
+		return "\n" + StyleDim.Render("  ^j/k up/down · enter connect · ^r rename · ^f star · ^d delete" + previewHint + " · esc quit")
 	}
-	return "\n" + StyleDim.Render("  ^j/k up/down · enter connect · ^r rename · ^s scan · ^f star · ^d delete · esc quit")
+	return "\n" + StyleDim.Render("  ^j/k up/down · enter connect · ^r rename · ^s scan · ^f star · ^d delete" + previewHint + " · esc quit")
 }
 
 // truncatePlain truncates a plain-text string to maxWidth runes.

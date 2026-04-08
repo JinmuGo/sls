@@ -14,6 +14,7 @@ import (
 	"github.com/jinmugo/sls/internal/container"
 	"github.com/jinmugo/sls/internal/favorites"
 	"github.com/jinmugo/sls/internal/finder"
+	"github.com/jinmugo/sls/internal/hostinfo"
 	"github.com/jinmugo/sls/internal/onboarding"
 	"github.com/jinmugo/sls/internal/pulse"
 	sshconfig "github.com/kevinburke/ssh_config"
@@ -79,6 +80,11 @@ func runInteractive(extraSSHArgs []string) error {
 		cache = &container.Cache{Hosts: make(map[string]container.HostCache)}
 	}
 
+	// Load host info cache for preview panel
+	infoCachePath, _ := hostinfo.DefaultCachePath()
+	infoCache, _ := hostinfo.LoadCache(infoCachePath)
+	infoFetcher := hostinfo.NewFetcher(infoCache)
+
 	// Track what needs reloading
 	needReloadHosts := true
 	needReloadFavs := false
@@ -114,6 +120,8 @@ func runInteractive(extraSSHArgs []string) error {
 			HostCount:      hostCount,
 			ContainerCount: containerCount,
 			HasScanned:     hasScanned,
+			InfoFetcher:    infoFetcher,
+			InfoCache:      infoCache,
 		}
 		if cacheWarning != "" {
 			opts.StatusMsg = cacheWarning
@@ -147,7 +155,7 @@ func runInteractive(extraSSHArgs []string) error {
 					needReloadCache = true
 				}
 			} else {
-				newName, renameErr := actions.RenameHost(result.Alias, favStore, cache)
+				newName, renameErr := actions.RenameHost(result.Alias, favStore, cache, infoCache)
 				if renameErr != nil {
 					statusMsg = finder.StyleError.Render("  ✗ " + renameErr.Error())
 				} else if newName != "" {
@@ -183,7 +191,7 @@ func runInteractive(extraSSHArgs []string) error {
 					needReloadCache = true
 				}
 			} else {
-				if delErr := actions.DeleteHost(result.Alias, favStore, cache); delErr != nil {
+				if delErr := actions.DeleteHost(result.Alias, favStore, cache, infoCache); delErr != nil {
 					statusMsg = finder.StyleError.Render("  ✗ " + delErr.Error())
 				} else {
 					statusMsg = finder.StyleSuccess.Render("  ✓ Deleted " + result.Alias)

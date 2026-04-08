@@ -1,0 +1,5 @@
+{
+  "last_turn_at": "2026-04-08T04:24:37.594Z",
+  "turn_count": 5,
+  "last_agent_output": "**Findings**\n\n1. The plan does not have a reliable notion of “host row.” It only has `IsNested`, whi"
+}

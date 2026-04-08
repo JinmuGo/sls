@@ -8,11 +8,12 @@ import (
 	"github.com/jinmugo/sls/internal/container"
 	"github.com/jinmugo/sls/internal/favorites"
 	"github.com/jinmugo/sls/internal/finder"
+	"github.com/jinmugo/sls/internal/hostinfo"
 	sshconfig "github.com/kevinburke/ssh_config"
 )
 
 // RenameHost renames an SSH host alias in the config, favorites, and container cache.
-func RenameHost(hostAlias string, favStore *favorites.Store, cache *container.Cache) (string, error) {
+func RenameHost(hostAlias string, favStore *favorites.Store, cache *container.Cache, infoCache ...*hostinfo.Cache) (string, error) {
 	renameItems := []finder.RenameItem{{
 		OriginalName: hostAlias,
 		DisplayInfo:  "SSH host",
@@ -75,6 +76,12 @@ func RenameHost(hostAlias string, favStore *favorites.Store, cache *container.Ca
 	if cache != nil {
 		cache.RenameHost(hostAlias, newName)
 		cache.Save()
+	}
+
+	// Cascade rename to hostinfo cache
+	if len(infoCache) > 0 && infoCache[0] != nil {
+		infoCache[0].RenameHost(hostAlias, newName)
+		infoCache[0].Save()
 	}
 
 	fmt.Fprintf(os.Stderr, "✓ Renamed: %s → \033[36m%s\033[0m\n", hostAlias, newName)
