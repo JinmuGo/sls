@@ -14,7 +14,7 @@ const (
 )
 
 // Shells to try in order during detection.
-var ShellCandidates = []string{ShellSh, ShellBash, ShellAsh}
+var ShellCandidates = []string{ShellBash, ShellSh, ShellAsh}
 
 // Container represents a Docker container discovered on a remote host.
 type Container struct {

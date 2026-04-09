@@ -56,15 +56,15 @@ func TestSaveShellToCache(t *testing.T) {
 }
 
 func TestShellCandidatesOrder(t *testing.T) {
-	// Verify the fallback order is sh → bash → ash
+	// Verify the fallback order is bash → sh → ash
 	if len(ShellCandidates) != 3 {
 		t.Fatalf("expected 3 shell candidates, got %d", len(ShellCandidates))
 	}
-	if ShellCandidates[0] != ShellSh {
-		t.Errorf("first candidate should be /bin/sh, got %s", ShellCandidates[0])
+	if ShellCandidates[0] != ShellBash {
+		t.Errorf("first candidate should be /bin/bash, got %s", ShellCandidates[0])
 	}
-	if ShellCandidates[1] != ShellBash {
-		t.Errorf("second candidate should be /bin/bash, got %s", ShellCandidates[1])
+	if ShellCandidates[1] != ShellSh {
+		t.Errorf("second candidate should be /bin/sh, got %s", ShellCandidates[1])
 	}
 	if ShellCandidates[2] != ShellAsh {
 		t.Errorf("third candidate should be /bin/ash, got %s", ShellCandidates[2])

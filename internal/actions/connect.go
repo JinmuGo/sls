@@ -12,7 +12,7 @@ import (
 )
 
 // Connect connects to a host or container. For containers, it tries the cached
-// shell first, then falls back through /bin/sh → /bin/bash → /bin/ash.
+// shell first, then falls back through /bin/bash → /bin/sh → /bin/ash.
 // The working shell is saved to cache for next time.
 func Connect(alias string, extraSSHArgs []string, favStore *favorites.Store, cache *container.Cache) error {
 	if strings.Contains(alias, container.KeySep) {
