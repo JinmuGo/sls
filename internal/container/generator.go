@@ -38,7 +38,7 @@ func GenerateIncludeFile(cache *Cache, outputPath string) error {
 			// Route through the parent host — inherits all SSH config automatically
 			b.WriteString(fmt.Sprintf("    ProxyJump %s\n", hostAlias))
 			// Use detected shell if available, fall back to /bin/sh
-			shell := ShellSh
+			shell := "/bin/sh"
 			if c.Shell != "" && c.Shell != ShellNone {
 				shell = c.Shell
 			}

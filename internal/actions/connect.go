@@ -12,8 +12,8 @@ import (
 )
 
 // Connect connects to a host or container. For containers, it tries the cached
-// shell first, then falls back through /bin/bash → /bin/sh → /bin/ash.
-// The working shell is saved to cache for next time.
+// shell first, then detects available shells via "command -v" (bash → sh → ash).
+// The working shell path is saved to cache for next time.
 func Connect(alias string, extraSSHArgs []string, favStore *favorites.Store, cache *container.Cache) error {
 	if strings.Contains(alias, container.KeySep) {
 		parts := strings.SplitN(alias, container.KeySep, 2)
@@ -70,12 +70,33 @@ func connectToContainer(hostAlias, containerName string, cache *container.Cache)
 	return nil
 }
 
-// detectAndConnect tries each shell candidate. Returns the working shell path.
+// detectAndConnect finds a shell via "command -v" and connects. Returns the detected shell path.
 func detectAndConnect(hostAlias, containerName string) (string, error) {
-	for _, shell := range container.ShellCandidates {
-		err := runner.SSHWithCmd(hostAlias, []string{"docker", "exec", "-it", containerName, shell})
-		if err == nil {
-			return shell, nil
+	// Build a single "command -v" query for all candidates
+	// e.g. "command -v bash || command -v sh || command -v ash"
+	var parts []string
+	for _, name := range container.ShellCandidates {
+		parts = append(parts, fmt.Sprintf("command -v %s", name))
+	}
+	query := strings.Join(parts, " || ")
+
+	// Try detecting via "sh -c" first (works if the container has any POSIX shell)
+	shellPath, err := runner.SSHOutput(hostAlias, []string{
+		"docker", "exec", containerName, "sh", "-c", query,
+	})
+	if err == nil && shellPath != "" {
+		if err := runner.SSHWithCmd(hostAlias, []string{"docker", "exec", "-it", containerName, shellPath}); err == nil {
+			return shellPath, nil
+		}
+	}
+
+	// Fallback: try well-known paths directly (for containers without sh at /bin/sh)
+	for _, name := range container.ShellCandidates {
+		for _, prefix := range []string{"/bin/", "/usr/bin/", "/usr/local/bin/"} {
+			path := prefix + name
+			if err := runner.SSHWithCmd(hostAlias, []string{"docker", "exec", "-it", containerName, path}); err == nil {
+				return path, nil
+			}
 		}
 	}
 

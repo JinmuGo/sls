@@ -1,20 +1,19 @@
 package container
 
+import "path/filepath"
+
 // KeySep is the separator between host alias and container name in composite keys.
 // Using "::" because "--" can appear in SSH host aliases.
 const KeySep = "::"
 
 // Shell detection results.
 const (
-	ShellUnknown = ""         // not yet tested
-	ShellNone    = "none"     // no shell found
-	ShellSh      = "/bin/sh"
-	ShellBash    = "/bin/bash"
-	ShellAsh     = "/bin/ash"
+	ShellUnknown = ""     // not yet tested
+	ShellNone    = "none" // no shell found
 )
 
-// Shells to try in order during detection.
-var ShellCandidates = []string{ShellBash, ShellSh, ShellAsh}
+// ShellCandidates lists shell names to search via "command -v" during detection.
+var ShellCandidates = []string{"bash", "sh", "ash"}
 
 // Container represents a Docker container discovered on a remote host.
 type Container struct {
@@ -30,16 +29,12 @@ type Container struct {
 // ShellLabel returns a short label for display in the finder.
 func (c Container) ShellLabel() string {
 	switch c.Shell {
+	case ShellUnknown:
+		return ""
 	case ShellNone:
 		return "no shell"
-	case ShellSh:
-		return "sh"
-	case ShellBash:
-		return "bash"
-	case ShellAsh:
-		return "ash"
 	default:
-		return ""
+		return filepath.Base(c.Shell)
 	}
 }
 

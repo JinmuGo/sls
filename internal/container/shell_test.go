@@ -9,9 +9,11 @@ func TestShellLabel(t *testing.T) {
 	}{
 		{ShellUnknown, ""},
 		{ShellNone, "no shell"},
-		{ShellSh, "sh"},
-		{ShellBash, "bash"},
-		{ShellAsh, "ash"},
+		{"/bin/sh", "sh"},
+		{"/bin/bash", "bash"},
+		{"/bin/ash", "ash"},
+		{"/usr/bin/bash", "bash"},
+		{"/usr/local/bin/fish", "fish"},
 	}
 
 	for _, tt := range tests {
@@ -37,7 +39,7 @@ func TestSaveShellToCache(t *testing.T) {
 	containers := cache.GetContainers("server")
 	for i, c := range containers {
 		if c.Name == "nginx" {
-			containers[i].Shell = ShellBash
+			containers[i].Shell = "/usr/bin/bash"
 		}
 	}
 	cache.Update("server", containers)
@@ -46,8 +48,8 @@ func TestSaveShellToCache(t *testing.T) {
 	// Reload and verify
 	cache2, _ := LoadCache(path)
 	for _, c := range cache2.GetContainers("server") {
-		if c.Name == "nginx" && c.Shell != ShellBash {
-			t.Errorf("expected nginx shell %q, got %q", ShellBash, c.Shell)
+		if c.Name == "nginx" && c.Shell != "/usr/bin/bash" {
+			t.Errorf("expected nginx shell %q, got %q", "/usr/bin/bash", c.Shell)
 		}
 		if c.Name == "redis" && c.Shell != ShellUnknown {
 			t.Errorf("expected redis shell empty, got %q", c.Shell)
@@ -60,13 +62,10 @@ func TestShellCandidatesOrder(t *testing.T) {
 	if len(ShellCandidates) != 3 {
 		t.Fatalf("expected 3 shell candidates, got %d", len(ShellCandidates))
 	}
-	if ShellCandidates[0] != ShellBash {
-		t.Errorf("first candidate should be /bin/bash, got %s", ShellCandidates[0])
-	}
-	if ShellCandidates[1] != ShellSh {
-		t.Errorf("second candidate should be /bin/sh, got %s", ShellCandidates[1])
-	}
-	if ShellCandidates[2] != ShellAsh {
-		t.Errorf("third candidate should be /bin/ash, got %s", ShellCandidates[2])
+	expected := []string{"bash", "sh", "ash"}
+	for i, want := range expected {
+		if ShellCandidates[i] != want {
+			t.Errorf("candidate[%d] should be %s, got %s", i, want, ShellCandidates[i])
+		}
 	}
 }
