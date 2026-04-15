@@ -94,7 +94,7 @@ func refreshAndRetry(hostAlias, containerName string, cache *container.Cache) er
 		return fmt.Errorf("container %s is not running on %s. Discovery also failed: %w", containerName, hostAlias, discErr)
 	}
 
-	cache.MergeUpdate(hostAlias, containers)
+	cache.RefreshExisting(hostAlias, containers)
 	cache.Save()
 
 	// Check if container still exists

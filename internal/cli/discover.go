@@ -86,7 +86,7 @@ func discoverAll(cache *container.Cache) error {
 			errors = append(errors, fmt.Sprintf("  ✗ %s: %v", r.Host, r.Err))
 			continue
 		}
-		cache.MergeUpdate(r.Host, r.Containers)
+		cache.RefreshExisting(r.Host, r.Containers)
 		totalContainers += len(r.Containers)
 		if len(r.Containers) > 0 {
 			fmt.Fprintf(os.Stderr, "  ✓ %s: %d container(s)\n", r.Host, len(r.Containers))

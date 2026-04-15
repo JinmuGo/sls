@@ -101,6 +101,38 @@ func (c *Cache) MergeUpdate(hostAlias string, discovered []Container) {
 	}
 }
 
+// RefreshExisting updates only containers already in cache for a host.
+// Preserves aliases and shell info. Removes containers that are no longer running.
+// Does NOT add newly discovered containers that weren't previously selected.
+func (c *Cache) RefreshExisting(hostAlias string, discovered []Container) {
+	existing := c.GetContainers(hostAlias)
+	if len(existing) == 0 {
+		return
+	}
+
+	discoveredMap := make(map[string]Container)
+	for _, d := range discovered {
+		discoveredMap[d.Name] = d
+	}
+
+	var updated []Container
+	for _, e := range existing {
+		if d, ok := discoveredMap[e.Name]; ok {
+			// Preserve alias and shell from cache
+			d.Alias = e.Alias
+			if e.Shell != "" {
+				d.Shell = e.Shell
+			}
+			updated = append(updated, d)
+		}
+	}
+
+	c.Hosts[hostAlias] = HostCache{
+		Containers: updated,
+		UpdatedAt:  time.Now(),
+	}
+}
+
 // RenameHost moves all cached containers from oldAlias to newAlias.
 func (c *Cache) RenameHost(oldAlias, newAlias string) {
 	hc, ok := c.Hosts[oldAlias]
