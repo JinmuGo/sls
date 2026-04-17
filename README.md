@@ -73,7 +73,7 @@ sls
 sls discover my-server
 
 # Connect directly to a container
-sls connect my-server--nginx
+sls connect my-server::nginx
 
 # Generate SSH config so vanilla ssh works too
 sls gen ssh-config
@@ -93,7 +93,8 @@ The interactive dashboard stays open after every action (except connect). Change
 | `ctrl+r` | Rename host alias |
 | `ctrl+f` | Toggle ⭐ favorite |
 | `ctrl+d` | Delete host (containers must be removed first) |
-| `ctrl+j/k` | Navigate up/down |
+| `ctrl+k` / `ctrl+p` | Navigate up |
+| `ctrl+j` / `ctrl+n` | Navigate down |
 | `esc` | Quit |
 
 ### On Containers
@@ -104,7 +105,8 @@ The interactive dashboard stays open after every action (except connect). Change
 | `ctrl+r` | Rename (custom display name) |
 | `ctrl+f` | Toggle ⭐ favorite (pinned to top) |
 | `ctrl+d` | Remove from dashboard |
-| `ctrl+j/k` | Navigate up/down |
+| `ctrl+k` / `ctrl+p` | Navigate up |
+| `ctrl+j` / `ctrl+n` | Navigate down |
 | `esc` | Quit |
 
 ## Container Discovery
@@ -140,14 +142,13 @@ sls gen ssh-config
 This creates `~/.config/sls/ssh_config` with entries like:
 
 ```
-Host my-server--nginx
-    HostName 10.0.0.1
-    User root
+Host my-server::nginx
+    ProxyJump my-server
     RemoteCommand docker exec -it nginx /bin/sh
     RequestTTY yes
 ```
 
-The `Include` directive is automatically added to your `~/.ssh/config`. After this, `ssh my-server--nginx` works from any terminal, even without sls installed.
+The `Include` directive is automatically added to your `~/.ssh/config`. After this, `ssh my-server::nginx` works from any terminal, even without sls installed. `ProxyJump` is used so all parent host SSH settings (keys, proxies, etc.) are inherited automatically.
 
 ## Other Commands
 
@@ -157,7 +158,7 @@ sls config list
 sls config add <alias>
 sls config edit <alias>
 sls config remove <alias>
-sls config format              # reformat ~/.ssh/config
+sls config format              # normalize indentation and spacing in ~/.ssh/config (creates .bak backup)
 
 # Favorites (also available via ctrl+f in dashboard)
 sls fav add <alias>
@@ -173,7 +174,7 @@ sls --tag <name>               # filter dashboard by tag
 
 # Connectivity
 sls test <host>                # test SSH connection
-sls connect <host--container>  # direct container access
+sls connect <host::container>  # direct container access
 
 # Shell completion
 sls completion [bash|zsh|fish|powershell]
