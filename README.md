@@ -34,7 +34,7 @@ sls > █
 - **Favorites**: pin frequently used hosts and containers to the top (⭐)
 - **Usage-based sorting**: most connected hosts float up automatically
 - **Interactive dashboard**: rename, delete, scan, and star without leaving the UI
-- **SSH config generation**: generate an include file so `ssh my-server::nginx` works everywhere
+- **SSH config generation**: generate an include file for container aliases such as `my-server::nginx`
 - **Safe writes**: atomic file operations protect your SSH config from corruption
 - **Zero dependencies**: single binary, no runtime requirements
 
