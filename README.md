@@ -34,7 +34,7 @@ sls > █
 - **Favorites**: pin frequently used hosts and containers to the top (⭐)
 - **Usage-based sorting**: most connected hosts float up automatically
 - **Interactive dashboard**: rename, delete, scan, and star without leaving the UI
-- **SSH config generation**: generate an include file so `ssh my-server--nginx` works everywhere
+- **SSH config generation**: generate an include file so `ssh my-server::nginx` works everywhere
 - **Safe writes**: atomic file operations protect your SSH config from corruption
 - **Zero dependencies**: single binary, no runtime requirements
 
@@ -77,7 +77,7 @@ sls connect my-server::nginx
 
 # Generate SSH config so vanilla ssh works too
 sls gen ssh-config
-# Then: ssh my-server--nginx  (works without sls!)
+# Then: ssh my-server::nginx  (works without sls!)
 ```
 
 ## Dashboard Shortcuts
