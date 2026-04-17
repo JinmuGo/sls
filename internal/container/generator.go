@@ -35,6 +35,9 @@ func GenerateIncludeFile(cache *Cache, outputPath string) error {
 			// Host line uses display name for user convenience
 			alias := hostAlias + KeySep + c.DisplayName()
 			b.WriteString(fmt.Sprintf("Host %s\n", alias))
+			// HostName localhost: after ProxyJump lands on the parent host, connect
+			// to localhost (the host itself) so RemoteCommand runs on that server.
+			b.WriteString("    HostName localhost\n")
 			// Route through the parent host — inherits all SSH config automatically
 			b.WriteString(fmt.Sprintf("    ProxyJump %s\n", hostAlias))
 			// Use detected shell if available, fall back to /bin/sh

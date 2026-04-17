@@ -34,7 +34,7 @@ sls > █
 - **Favorites**: pin frequently used hosts and containers to the top (⭐)
 - **Usage-based sorting**: most connected hosts float up automatically
 - **Interactive dashboard**: rename, delete, scan, and star without leaving the UI
-- **SSH config generation**: generate an include file so `ssh my-server--nginx` works everywhere
+- **SSH config generation**: generate an include file for container aliases such as `my-server::nginx`
 - **Safe writes**: atomic file operations protect your SSH config from corruption
 - **Zero dependencies**: single binary, no runtime requirements
 
@@ -73,11 +73,11 @@ sls
 sls discover my-server
 
 # Connect directly to a container
-sls connect my-server--nginx
+sls connect my-server::nginx
 
 # Generate SSH config so vanilla ssh works too
 sls gen ssh-config
-# Then: ssh my-server--nginx  (works without sls!)
+# Then: ssh my-server::nginx  (works without sls!)
 ```
 
 ## Dashboard Shortcuts
@@ -93,7 +93,8 @@ The interactive dashboard stays open after every action (except connect). Change
 | `ctrl+r` | Rename host alias |
 | `ctrl+f` | Toggle ⭐ favorite |
 | `ctrl+d` | Delete host (containers must be removed first) |
-| `ctrl+j/k` | Navigate up/down |
+| `ctrl+k` / `ctrl+p` | Navigate up |
+| `ctrl+j` / `ctrl+n` | Navigate down |
 | `esc` | Quit |
 
 ### On Containers
@@ -104,7 +105,8 @@ The interactive dashboard stays open after every action (except connect). Change
 | `ctrl+r` | Rename (custom display name) |
 | `ctrl+f` | Toggle ⭐ favorite (pinned to top) |
 | `ctrl+d` | Remove from dashboard |
-| `ctrl+j/k` | Navigate up/down |
+| `ctrl+k` / `ctrl+p` | Navigate up |
+| `ctrl+j` / `ctrl+n` | Navigate down |
 | `esc` | Quit |
 
 ## Container Discovery
@@ -140,14 +142,14 @@ sls gen ssh-config
 This creates `~/.config/sls/ssh_config` with entries like:
 
 ```
-Host my-server--nginx
-    HostName 10.0.0.1
-    User root
+Host my-server::nginx
+    HostName localhost
+    ProxyJump my-server
     RemoteCommand docker exec -it nginx /bin/sh
     RequestTTY yes
 ```
 
-The `Include` directive is automatically added to your `~/.ssh/config`. After this, `ssh my-server--nginx` works from any terminal, even without sls installed.
+The `Include` directive will be added to your `~/.ssh/config` if possible; otherwise, `sls gen ssh-config` prints manual instructions. After this is set up, `ssh my-server::nginx` works from any terminal, even without sls installed. `ProxyJump` routes through the parent host (inheriting all its SSH settings), and `HostName localhost` ensures the connection lands on the server itself before running `docker exec`.
 
 ## Other Commands
 
@@ -157,7 +159,7 @@ sls config list
 sls config add <alias>
 sls config edit <alias>
 sls config remove <alias>
-sls config format              # reformat ~/.ssh/config
+sls config format              # normalize indentation and spacing in ~/.ssh/config (creates .bak backup)
 
 # Favorites (also available via ctrl+f in dashboard)
 sls fav add <alias>
@@ -173,7 +175,7 @@ sls --tag <name>               # filter dashboard by tag
 
 # Connectivity
 sls test <host>                # test SSH connection
-sls connect <host--container>  # direct container access
+sls connect <host::container>  # direct container access
 
 # Shell completion
 sls completion [bash|zsh|fish|powershell]
