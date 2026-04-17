@@ -143,12 +143,13 @@ This creates `~/.config/sls/ssh_config` with entries like:
 
 ```
 Host my-server::nginx
+    HostName localhost
     ProxyJump my-server
     RemoteCommand docker exec -it nginx /bin/sh
     RequestTTY yes
 ```
 
-The `Include` directive is automatically added to your `~/.ssh/config`. After this, `ssh my-server::nginx` works from any terminal, even without sls installed. `ProxyJump` is used so all parent host SSH settings (keys, proxies, etc.) are inherited automatically.
+The `Include` directive will be added to your `~/.ssh/config` if possible; otherwise, `sls gen ssh-config` prints manual instructions. After this is set up, `ssh my-server::nginx` works from any terminal, even without sls installed. `ProxyJump` routes through the parent host (inheriting all its SSH settings), and `HostName localhost` ensures the connection lands on the server itself before running `docker exec`.
 
 ## Other Commands
 
