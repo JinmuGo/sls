@@ -28,9 +28,13 @@ import (
 	"time"
 )
 
+// Overridable at build time via -ldflags "-X github.com/jinmugo/sls/internal/pulse.defaultEndpoint=... -X ...defaultAPIKey=..."
+var (
+	defaultEndpoint = "https://telemetry.jinmu.me"
+	defaultAPIKey   = "pulse-dev-key"
+)
+
 const (
-	defaultEndpoint  = "https://pulse.jinmu.me"
-	defaultAPIKey    = "pulse-dev-key"
 	flushInterval    = 30 * time.Second
 	maxQueueSize     = 50
 	batchThreshold   = 10
@@ -70,8 +74,8 @@ func Init(version string) {
 		return
 	}
 
-	endpoint = getEnv("PULSE_ENDPOINT", defaultEndpoint)
-	apiKey = getEnv("PULSE_API_KEY", defaultAPIKey)
+	endpoint = getEnv("TELEMETRY_ENDPOINT", defaultEndpoint)
+	apiKey = getEnv("TELEMETRY_API_KEY", defaultAPIKey)
 
 	ctx = map[string]interface{}{
 		"os":      runtime.GOOS,

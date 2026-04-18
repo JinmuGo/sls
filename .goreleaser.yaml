@@ -26,6 +26,8 @@ builds:
       - -X github.com/jinmugo/sls/cmd.commit={{.Commit}}
       - -X github.com/jinmugo/sls/cmd.date={{.Date}}
       - -X github.com/jinmugo/sls/cmd.builtBy=goreleaser
+      - -X github.com/jinmugo/sls/internal/pulse.defaultEndpoint={{.Env.TELEMETRY_ENDPOINT}}
+      - -X github.com/jinmugo/sls/internal/pulse.defaultAPIKey={{.Env.TELEMETRY_API_KEY}}
 
 archives:
   - formats: [tar.gz]
