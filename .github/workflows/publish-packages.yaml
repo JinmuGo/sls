@@ -59,7 +59,25 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y dpkg-dev createrepo-c
+          sudo apt-get install -y dpkg-dev createrepo-c rpm
+
+      - name: Sign RPM packages
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+        run: |
+          cat > ~/.rpmmacros << 'EOF'
+          %_signature gpg
+          %_gpg_name GPG_KEY_ID_PLACEHOLDER
+          %__gpg /usr/bin/gpg
+          %__gpg_sign_cmd %{__gpg} gpg --batch --no-armor --pinentry-mode loopback --passphrase GPG_PASSPHRASE_PLACEHOLDER --no-secmem-warning -u "%{_gpg_name}" -sbo %{__signature_filename} --digest-algo sha256 %{__plaintext_filename}
+          EOF
+          sed -i "s|GPG_KEY_ID_PLACEHOLDER|$GPG_KEY_ID|g" ~/.rpmmacros
+          sed -i "s|GPG_PASSPHRASE_PLACEHOLDER|$GPG_PASSPHRASE|g" ~/.rpmmacros
+
+          for rpm in artifacts/*.rpm; do
+            rpmsign --addsign "$rpm"
+          done
 
       - name: Setup APT repository
         env:
