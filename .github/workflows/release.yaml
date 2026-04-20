@@ -31,3 +31,5 @@ jobs:
           args: ${{ github.event_name == 'pull_request' && 'release --snapshot --skip=publish --clean' || 'release --clean' }}
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
+          TELEMETRY_ENDPOINT: ${{ secrets.TELEMETRY_ENDPOINT }}
+          TELEMETRY_API_KEY: ${{ secrets.TELEMETRY_API_KEY }}

@@ -5,11 +5,16 @@ COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
 DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 BUILT_BY ?= $(shell whoami)
 
+TELEMETRY_ENDPOINT ?= https://telemetry.jinmu.me
+TELEMETRY_API_KEY ?= pulse-dev-key
+
 LDFLAGS := -s -w \
 	-X github.com/jinmugo/sls/cmd.version=$(VERSION) \
 	-X github.com/jinmugo/sls/cmd.commit=$(COMMIT) \
 	-X github.com/jinmugo/sls/cmd.date=$(DATE) \
-	-X github.com/jinmugo/sls/cmd.builtBy=$(BUILT_BY)
+	-X github.com/jinmugo/sls/cmd.builtBy=$(BUILT_BY) \
+	-X github.com/jinmugo/sls/internal/pulse.defaultEndpoint=$(TELEMETRY_ENDPOINT) \
+	-X github.com/jinmugo/sls/internal/pulse.defaultAPIKey=$(TELEMETRY_API_KEY)
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
