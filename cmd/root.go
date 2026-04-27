@@ -55,7 +55,10 @@ func runInteractive(extraSSHArgs []string) error {
 	}
 
 	if len(hosts) == 0 {
-		retry, alias, _ := onboarding.HandleEmptyConfig()
+		retry, alias, onboardErr := onboarding.HandleEmptyConfig()
+		if onboardErr != nil {
+			return onboardErr
+		}
 		if alias != "" {
 			if addErr := cli.RunConfigAdd(alias); addErr != nil {
 				return addErr

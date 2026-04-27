@@ -44,11 +44,6 @@ func HandleMissingConfig(err error) (shouldRetry bool, addAlias string, retErr e
 		return promptAddFirstHost(reader)
 	}
 
-	if errors.Is(err, config.ErrSSHConfigEmpty) {
-		fmt.Println("No SSH hosts configured.")
-		return promptAddFirstHost(reader)
-	}
-
 	return false, "", err
 }
 
