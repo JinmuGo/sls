@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -80,20 +81,31 @@ func detectAndConnect(hostAlias, containerName string) (string, error) {
 	}
 	query := strings.Join(parts, " || ")
 
-	// Try detecting via "sh -c" first (works if the container has any POSIX shell)
-	shellPath, err := runner.SSHOutput(hostAlias, []string{
-		"docker", "exec", containerName, "sh", "-c", query,
-	})
-	if err == nil && shellPath != "" {
-		if err := runner.SSHWithCmd(hostAlias, []string{"docker", "exec", "-it", containerName, shellPath}); err == nil {
-			return shellPath, nil
+	// Try detecting via "sh -c". Use Probe (non-interactive, with timeout) and
+	// single-quote the inner command so the remote shell doesn't split on "||".
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	out, err := runner.Probe(ctx, hostAlias, fmt.Sprintf("docker exec %s sh -c '%s'", containerName, query))
+	cancel()
+	if err == nil {
+		shellPath := strings.TrimSpace(string(out))
+		if shellPath != "" {
+			if err := runner.SSHWithCmd(hostAlias, []string{"docker", "exec", "-it", containerName, shellPath}); err == nil {
+				return shellPath, nil
+			}
 		}
 	}
 
-	// Fallback: try well-known paths directly (for containers without sh at /bin/sh)
+	// Fallback: probe each well-known path with a timeout, then connect only once confirmed.
+	// This avoids hanging on paths that cause docker exec to stall rather than fail fast.
 	for _, name := range container.ShellCandidates {
 		for _, prefix := range []string{"/bin/", "/usr/bin/", "/usr/local/bin/"} {
 			path := prefix + name
+			ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
+			_, probeErr := runner.Probe(ctx2, hostAlias, fmt.Sprintf("docker exec %s test -x %s", containerName, path))
+			cancel2()
+			if probeErr != nil {
+				continue
+			}
 			if err := runner.SSHWithCmd(hostAlias, []string{"docker", "exec", "-it", containerName, path}); err == nil {
 				return path, nil
 			}
