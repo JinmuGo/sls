@@ -1,5 +1,8 @@
 # sls (ssh ls)
 
+[![Website](https://img.shields.io/badge/website-sls.jinmu.me-ff6b00)](https://sls.jinmu.me)
+[![GitHub Stars](https://img.shields.io/github/stars/jinmugo/sls?style=flat&color=333)](https://github.com/jinmugo/sls)
+
 A smart terminal dashboard for SSH hosts and Docker containers.
 One command to find, connect, and manage everything you SSH into.
 

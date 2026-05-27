@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- Primary SEO Meta Tags -->
+    <title>sls (ssh ls) — Smart SSH and Docker TUI Selector</title>
+    <meta name="title" content="sls (ssh ls) — Smart SSH and Docker TUI Selector" />
+    <meta name="description" content="One command to find, connect, and manage everything you SSH into. Discover remote Docker containers and connect instantly with built-in fuzzy search." />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://sls.jinmu.me/" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://sls.jinmu.me/" />
+    <meta property="og:title" content="sls (ssh ls) — Smart SSH and Docker TUI Selector" />
+    <meta property="og:description" content="One command to find, connect, and manage everything you SSH into. Discover remote Docker containers and connect instantly." />
+    <meta property="og:image" content="https://sls.jinmu.me/og-image.png" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://sls.jinmu.me/" />
+    <meta property="twitter:title" content="sls (ssh ls) — Smart SSH and Docker TUI Selector" />
+    <meta property="twitter:description" content="One command to find, connect, and manage everything you SSH into." />
+    <meta property="twitter:image" content="https://sls.jinmu.me/og-image.png" />
+
+    <!-- Geo / Location Meta Tags -->
+    <meta name="geo.region" content="KR" />
+    <meta name="geo.placename" content="Seoul" />
+    <meta name="geo.position" content="37.5665;126.9780" />
+    <meta name="ICBM" content="37.5665, 126.9780" />
+
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "sls",
+        "operatingSystem": "macOS, Linux",
+        "applicationCategory": "DeveloperApplication",
+        "offers": {
+          "@type": "Offer",
+          "price": "0.00",
+          "priceCurrency": "USD"
+        },
+        "description": "A smart terminal dashboard for SSH hosts and Docker containers. One command to find, connect, and manage everything you SSH into.",
+        "downloadUrl": "https://github.com/jinmugo/sls/releases",
+        "softwareVersion": "1.0.0",
+        "releaseNotes": "https://github.com/jinmugo/sls/releases",
+        "license": "https://opensource.org/licenses/MIT"
+      }
+    </script>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500&family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="app">
+      <!-- Minimal Header -->
+      <header class="app-header">
+        <div class="logo-container">
+          <div class="logo-text">sls<span class="logo-cursor">_</span></div>
+        </div>
+        <nav class="nav-links">
+          <a href="https://twitter.com/intent/tweet?text=Just%20found%20sls%20%E2%80%94%20a%20smart,%20zero-dependency%20terminal%20dashboard%20for%20SSH%20hosts%20and%20Docker%20containers.%20It%20makes%20ssh%20jumping%20a%20breeze!%20https://sls.jinmu.me" target="_blank" rel="noopener" class="share-link" id="header-share-btn">
+            Share
+          </a>
+          <a href="https://github.com/jinmugo/sls" target="_blank" rel="noopener" class="github-link" id="header-github-btn">
+            GitHub
+          </a>
+        </nav>
+      </header>
+
+      <!-- Main Layout -->
+      <main class="main-content">
+        <!-- Hero Section -->
+        <section class="hero-section">
+          <h1 class="hero-title">
+            Find, connect, and manage everything you SSH into.
+          </h1>
+          <p class="hero-subtitle">
+            A smart, zero-dependency terminal dashboard for SSH hosts and Docker containers.
+          </p>
+          
+          <!-- Inline Install Switcher -->
+          <div class="install-switcher">
+            <span class="switcher-tab active" data-cmd="brew" id="tab-brew">macOS</span>
+            <span class="switcher-tab" data-cmd="curl" id="tab-curl">Linux (cURL)</span>
+            <span class="switcher-tab" data-cmd="go" id="tab-go">Go Source</span>
+          </div>
+
+          <!-- Single Installer Code Line -->
+          <div class="install-bar">
+            <span class="cmd-prompt">$</span>
+            <code class="cmd-text" id="cmd-brew">brew install jinmugo/tap/sls</code>
+            <button class="copy-btn" id="btn-copy-install" aria-label="Copy installation command">
+              <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span class="copy-text">Copy</span>
+            </button>
+          </div>
+          
+          <!-- Terminal Demo Window -->
+          <div class="terminal-container">
+            <div class="terminal-window">
+              <div class="terminal-viewport">
+                <img id="demo-image" alt="sls CLI Demo" class="demo-gif" />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Minimal Features List -->
+        <section class="features-section" id="features">
+          <div class="features-list">
+            <div class="feature-item">
+              <h3>Fuzzy Selector</h3>
+              <p>Type any fragment of an SSH alias or container name to filter in real-time.</p>
+            </div>
+            <div class="feature-item">
+              <h3>Docker Discovery</h3>
+              <p>Scan remote servers via SSH to discover running containers and cache names locally.</p>
+            </div>
+            <div class="feature-item">
+              <h3>Transparent Config</h3>
+              <p>Generates native SSH includes so you can run <code>ssh host::container</code> from anywhere.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- TUI Dashboard Shortcuts -->
+        <section class="shortcuts-section">
+          <h2 class="section-title">Dashboard Shortcuts</h2>
+          <div class="shortcuts-grid">
+            <div class="shortcut-row">
+              <span class="shortcut-key">Enter</span>
+              <span class="shortcut-desc">Connect via SSH or open container shell</span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-key">Ctrl + S</span>
+              <span class="shortcut-desc">Scan remote host for running Docker containers</span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-key">Ctrl + F</span>
+              <span class="shortcut-desc">Toggle favorite (pins item to top)</span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-key">Ctrl + R</span>
+              <span class="shortcut-desc">Rename host alias or container display name</span>
+            </div>
+            <div class="shortcut-row">
+              <span class="shortcut-key">Esc</span>
+              <span class="shortcut-desc">Quit finder / reset dashboard</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Developer FAQ -->
+        <section class="faq-section">
+          <h2 class="section-title">Frequently Asked Questions</h2>
+          <div class="faq-list">
+            <div class="faq-item">
+              <h4 class="faq-question">Do I need to install an agent on my servers?</h4>
+              <p class="faq-answer">No. <code>sls</code> is client-side only. It queries containers by running <code>docker ps</code> over temporary, non-interactive SSH connections. No remote daemons or configuration changes are required on your servers.</p>
+            </div>
+            <div class="faq-item">
+              <h4 class="faq-question">Does it modify my primary SSH config?</h4>
+              <p class="faq-answer">No. <code>sls</code> never writes to your main <code>~/.ssh/config</code> file. It generates a separate, isolated container include file at <code>~/.config/sls/ssh_config</code> and links it safely via a standard <code>Include</code> directive, keeping your custom configurations safe.</p>
+            </div>
+            <div class="faq-item">
+              <h4 class="faq-question">How does it authenticate?</h4>
+              <p class="faq-answer">It natively inherits all configurations, identity keys, proxy jumps, and credentials defined in your local <code>~/.ssh/config</code>, working seamlessly with your existing SSH agent.</p>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <!-- Minimal Footer -->
+      <footer class="app-footer">
+        <p>Created by <a href="https://github.com/jinmugo" target="_blank" rel="noopener">jinmugo</a></p>
+        <div class="footer-links">
+          <a href="https://github.com/jinmugo/sls" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/jinmugo/sls/releases" target="_blank" rel="noopener">Releases</a>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
