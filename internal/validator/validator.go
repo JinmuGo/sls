@@ -12,6 +12,10 @@ import (
 var (
 	// Alias must be alphanumeric with optional hyphens, underscores, and dots
 	aliasRegex = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
+	// A hostname label may contain only alphanumerics, hyphens and underscores.
+	// This blocks whitespace and shell/SSH-config metacharacters that could be
+	// used to inject extra directives into ~/.ssh/config.
+	hostLabelRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 )
 
 // ValidateAlias checks if the given alias is valid for SSH config
@@ -24,6 +28,10 @@ func ValidateAlias(alias string) error {
 	}
 	if strings.Contains(alias, " ") {
 		return fmt.Errorf("alias cannot contain spaces")
+	}
+	// A leading '-' would be interpreted by ssh as a command-line flag.
+	if strings.HasPrefix(alias, "-") {
+		return fmt.Errorf("alias cannot start with '-'")
 	}
 	if !aliasRegex.MatchString(alias) {
 		return fmt.Errorf("alias must contain only alphanumeric characters, hyphens, underscores, and dots")
@@ -64,7 +72,11 @@ func ValidateHostname(hostname string) error {
 		if len(part) == 0 || len(part) > 63 {
 			return fmt.Errorf("invalid hostname format: each label must be 1-63 characters")
 		}
-		// Allow alphanumeric and hyphens, but not starting/ending with hyphen
+		// Reject whitespace and metacharacters that could inject config directives.
+		if !hostLabelRegex.MatchString(part) {
+			return fmt.Errorf("invalid hostname format: labels may contain only letters, digits, hyphens and underscores")
+		}
+		// Labels cannot start or end with a hyphen.
 		if part[0] == '-' || part[len(part)-1] == '-' {
 			return fmt.Errorf("invalid hostname format: labels cannot start or end with hyphen")
 		}

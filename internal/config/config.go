@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	sshconfig "github.com/kevinburke/ssh_config"
 )
@@ -39,8 +40,10 @@ func parseReader(r io.Reader) ([]*sshconfig.Host, error) {
 }
 
 func GetKV(h *sshconfig.Host, key string) string {
+	// SSH config keywords are case-insensitive, so match regardless of the
+	// capitalization used in the file (e.g. "hostname" vs "HostName").
 	for _, n := range h.Nodes {
-		if kv, ok := n.(*sshconfig.KV); ok && kv.Key == key {
+		if kv, ok := n.(*sshconfig.KV); ok && strings.EqualFold(kv.Key, key) {
 			return kv.Value
 		}
 	}

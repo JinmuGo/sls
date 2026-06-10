@@ -31,32 +31,25 @@ func LoadAST(custom string) (*sshconfig.Config, string, error) {
 	}
 	defer f.Close()
 
+	// Decode can return (nil, err) — e.g. when the config contains a Match
+	// directive, which the parser does not support. Returning early avoids a
+	// nil-pointer panic and surfaces the real error to the caller.
 	cfg, err := sshconfig.Decode(f)
-
-	hosts := []*sshconfig.Host{}
-	for _, h := range cfg.Hosts {
-		if len(h.Patterns) > 0 && h.Patterns[0].String() != "*" {
-			hosts = append(hosts, h)
-		}
+	if err != nil {
+		return nil, path, err
 	}
-	cfg.Hosts = hosts
 
-	return cfg, path, err
+	// NOTE: the full config (including the implicit/explicit "Host *" block and
+	// all global directives) is returned intact. SaveAST round-trips the whole
+	// AST, so callers must not strip hosts here or those entries are lost on save.
+	return cfg, path, nil
 }
 
 func SaveAST(cfg *sshconfig.Config, path string) error {
-	var buf bytes.Buffer
-	for _, h := range cfg.Hosts {
-		buf.WriteString(fmt.Sprintf("Host %s\n", h.Patterns[0].String()))
-		for _, n := range h.Nodes {
-			if kv, ok := n.(*sshconfig.KV); ok {
-				buf.WriteString(fmt.Sprintf("    %s\t%s\n", kv.Key, kv.Value))
-			}
-		}
-		buf.WriteString("\n")
-	}
-	// SSH config files should be 0600 for security — use atomic write
-	return util.AtomicWriteFile(path, buf.Bytes(), 0o600)
+	// Use the library's faithful serializer so that global directives, the
+	// "Host *" block, comments, Include directives, and multi-pattern Host lines
+	// are all preserved. SSH config files should be 0600 — use an atomic write.
+	return util.AtomicWriteFile(path, []byte(cfg.String()), 0o600)
 }
 
 // FormatConfig reads the SSH config file, formats it with consistent style, and writes it back.
@@ -150,7 +143,7 @@ func FormatConfig(custom string) error {
 		}
 	}
 
-	if err := os.WriteFile(path, buf.Bytes(), 0o600); err != nil {
+	if err := util.AtomicWriteFile(path, buf.Bytes(), 0o600); err != nil {
 		return fmt.Errorf("failed to write formatted config: %w", err)
 	}
 
@@ -171,8 +164,10 @@ func SetKV(h *sshconfig.Host, key, val string) {
 	if val == "" {
 		return
 	}
+	// SSH config keywords are case-insensitive; match an existing key regardless
+	// of how the user capitalized it to avoid writing a duplicate directive.
 	for _, n := range h.Nodes {
-		if kv, ok := n.(*sshconfig.KV); ok && kv.Key == key {
+		if kv, ok := n.(*sshconfig.KV); ok && strings.EqualFold(kv.Key, key) {
 			kv.Value = val
 			return
 		}

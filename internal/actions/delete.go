@@ -40,9 +40,9 @@ func DeleteHost(hostAlias string, favStore *favorites.Store, cache *container.Ca
 		return fmt.Errorf("save SSH config: %w", err)
 	}
 
-	// Clean up favorites
+	// Clean up favorites/usage metadata entirely (no orphan key left behind)
 	if favStore != nil {
-		favStore.Remove(hostAlias)
+		favStore.Delete(hostAlias)
 	}
 
 	// Clean up hostinfo cache
@@ -77,10 +77,10 @@ func DeleteContainer(cache *container.Cache, hostAlias, containerName string, fa
 		return fmt.Errorf("save cache: %w", err)
 	}
 
-	// Clean up favorites for this container
+	// Clean up favorites/usage metadata for this container (remove the key)
 	if favStore != nil {
 		key := hostAlias + container.KeySep + containerName
-		favStore.Remove(key)
+		favStore.Delete(key)
 	}
 
 	fmt.Fprintf(os.Stderr, "✓ Removed container \033[31m%s\033[0m from %s\n", deletedName, hostAlias)

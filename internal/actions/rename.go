@@ -43,6 +43,12 @@ func RenameHost(hostAlias string, favStore *favorites.Store, cache *container.Ca
 		return "", fmt.Errorf("host %s not found in SSH config", hostAlias)
 	}
 
+	// Refuse to rename onto an existing alias: doing so would create a duplicate
+	// Host block in ~/.ssh/config and clobber the target's cached containers.
+	if existing, _ := config.FindHost(cfg, newName); existing != nil {
+		return "", fmt.Errorf("host %q already exists", newName)
+	}
+
 	newPattern, err := sshconfig.NewPattern(newName)
 	if err != nil {
 		return "", fmt.Errorf("invalid alias %q: %w", newName, err)
@@ -53,21 +59,15 @@ func RenameHost(hostAlias string, favStore *favorites.Store, cache *container.Ca
 		return "", fmt.Errorf("save SSH config: %w", err)
 	}
 
-	// Cascade rename to favorites
+	// Cascade rename to favorites/usage metadata, preserving usage count and tags.
 	if favStore != nil {
-		if favStore.IsFavorite(hostAlias) {
-			favStore.Remove(hostAlias)
-			favStore.Add(newName)
-		}
-		// Also rename any container favorites
+		favStore.Rename(hostAlias, newName)
+		// Also rename any container metadata keyed under this host.
 		if cache != nil {
 			for _, c := range cache.GetContainers(hostAlias) {
 				oldKey := hostAlias + container.KeySep + c.Name
 				newKey := newName + container.KeySep + c.Name
-				if favStore.IsFavorite(oldKey) {
-					favStore.Remove(oldKey)
-					favStore.Add(newKey)
-				}
+				favStore.Rename(oldKey, newKey)
 			}
 		}
 	}
