@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/jinmugo/sls/internal/util"
 )
 
 // Entry represents metadata for a single host
@@ -56,10 +58,9 @@ func (s *Store) save() error {
 	if err != nil {
 		return fmt.Errorf("marshal meta data: %w", err)
 	}
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
-		return fmt.Errorf("create config directory: %w", err)
-	}
-	if err := os.WriteFile(s.path, b, 0o644); err != nil {
+	// Atomic write: a torn meta.json (e.g. process killed mid-write) would fail
+	// to parse and brick sls on the next startup, so write+rename instead.
+	if err := util.AtomicWriteFile(s.path, b, 0o600); err != nil {
 		return fmt.Errorf("write meta file: %w", err)
 	}
 	return nil
@@ -79,6 +80,30 @@ func (s *Store) Remove(h string) error {
 		return s.save()
 	}
 	return nil
+}
+
+// Delete removes a host's metadata entry entirely (favorite flag, usage count,
+// and tags). Used when a host or container is deleted so no orphan key lingers
+// in meta.json.
+func (s *Store) Delete(h string) error {
+	if _, ok := s.data[h]; !ok {
+		return nil
+	}
+	delete(s.data, h)
+	return s.save()
+}
+
+// Rename moves a host's entire metadata entry (favorite flag, usage count, and
+// tags) from oldKey to newKey, preserving history across a rename. If newKey
+// already exists it is overwritten. No-op if oldKey is absent.
+func (s *Store) Rename(oldKey, newKey string) error {
+	e, ok := s.data[oldKey]
+	if !ok || oldKey == newKey {
+		return nil
+	}
+	s.data[newKey] = e
+	delete(s.data, oldKey)
+	return s.save()
 }
 
 func (s *Store) List() []string {

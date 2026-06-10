@@ -28,6 +28,11 @@ var rootCmd = &cobra.Command{
 	Short: "Smart fuzzy CLI selector for SSH config hosts",
 	Long:  "sls is an interactive CLI tool for selecting and connecting to SSH hosts defined in ~/.ssh/config.",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// `sls --version` / `sls -v` should print version info, not launch the TUI.
+		if ok, _ := cmd.Flags().GetBool("version"); ok {
+			versionCmd.Run(cmd, args)
+			return nil
+		}
 		return runInteractive(args)
 	},
 }
@@ -107,11 +112,18 @@ func runInteractive(extraSSHArgs []string) error {
 			needReloadHosts = false
 		}
 		if needReloadFavs {
-			favStore, _ = favorites.DefaultStore()
+			// Keep the previous store on error: overwriting favStore with a nil
+			// pointer would panic the TUI loop on the next buildItems call.
+			if fs, ferr := favorites.DefaultStore(); ferr == nil {
+				favStore = fs
+			}
 			needReloadFavs = false
 		}
 		if needReloadCache {
-			cache, _ = container.LoadCache(cachePath)
+			// Likewise, only replace the cache when the reload succeeds.
+			if c, cerr := container.LoadCache(cachePath); cerr == nil {
+				cache = c
+			}
 			needReloadCache = false
 		}
 

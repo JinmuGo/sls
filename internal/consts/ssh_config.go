@@ -13,9 +13,11 @@ var RequiredSSHConfigOptions = map[string]struct{}{
 	SSHConfigUser:     {},
 }
 
+// AllSSHConfigOptions lists per-host keywords offered when adding an option to a
+// Host block. "Host" and "Match" are intentionally excluded: they are structural
+// block headers, not per-host directives, and writing them as a host's key/value
+// would corrupt ~/.ssh/config.
 var AllSSHConfigOptions = map[string]struct{}{
-	"Host":                             {},
-	"Match":                            {},
 	"HostName":                         {},
 	"User":                             {},
 	"Port":                             {},

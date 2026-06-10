@@ -52,10 +52,13 @@ func connectToContainer(hostAlias, containerName string, cache *container.Cache)
 	// If we have a cached shell, try it directly
 	if cachedShell != container.ShellUnknown {
 		err := runner.SSHWithCmd(hostAlias, []string{"docker", "exec", "-it", containerName, cachedShell})
-		if err == nil {
-			return nil
+		// Only re-detect when the shell or connection failed to *start*. A normal
+		// interactive session that simply exited non-zero (e.g. the last command
+		// failed) must not trigger a surprise reconnect or poison the cache.
+		if !shellStartFailed(err) {
+			return err
 		}
-		// Cached shell failed — fall through to detection
+		// Cached shell failed to start — fall through to detection
 		fmt.Fprintf(os.Stderr, "Cached shell %s failed, detecting available shells...\n", cachedShell)
 	}
 
@@ -89,7 +92,10 @@ func detectAndConnect(hostAlias, containerName string) (string, error) {
 	if err == nil {
 		shellPath := strings.TrimSpace(string(out))
 		if shellPath != "" {
-			if err := runner.SSHWithCmd(hostAlias, []string{"docker", "exec", "-it", containerName, shellPath}); err == nil {
+			// The probe already confirmed this shell exists, so a non-start
+			// failure means the session ran and ended — the shell works.
+			connErr := runner.SSHWithCmd(hostAlias, []string{"docker", "exec", "-it", containerName, shellPath})
+			if !shellStartFailed(connErr) {
 				return shellPath, nil
 			}
 		}
@@ -106,13 +112,33 @@ func detectAndConnect(hostAlias, containerName string) (string, error) {
 			if probeErr != nil {
 				continue
 			}
-			if err := runner.SSHWithCmd(hostAlias, []string{"docker", "exec", "-it", containerName, path}); err == nil {
+			// `test -x` already confirmed the path is executable, so treat a
+			// non-start failure as a completed session rather than a missing shell.
+			connErr := runner.SSHWithCmd(hostAlias, []string{"docker", "exec", "-it", containerName, path})
+			if !shellStartFailed(connErr) {
 				return path, nil
 			}
 		}
 	}
 
 	return "", fmt.Errorf("no shell available in container %s on %s", containerName, hostAlias)
+}
+
+// shellStartFailed reports whether an ssh / docker-exec error means the shell or
+// connection failed to start, as opposed to a normal interactive session that
+// exited with a non-zero status. Docker exits 125 (daemon/container error), 126
+// (command not executable) or 127 (command not found); ssh exits 255 on
+// connection failure; -1 means the process could not be started or was signalled.
+func shellStartFailed(err error) bool {
+	if err == nil {
+		return false
+	}
+	switch runner.ExitCode(err) {
+	case 125, 126, 127, 255, -1:
+		return true
+	default:
+		return false
+	}
 }
 
 func refreshAndRetry(hostAlias, containerName string, cache *container.Cache) error {

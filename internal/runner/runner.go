@@ -1,12 +1,25 @@
 package runner
 
 import (
-    "bytes"
+    "errors"
     "os"
     "os/exec"
-    "strings"
     "syscall"
 )
+
+// ExitCode returns the process exit code carried by err, or -1 if err is not an
+// *exec.ExitError (e.g. the command could not be started or was killed by a
+// signal). Returns 0 when err is nil.
+func ExitCode(err error) int {
+    if err == nil {
+        return 0
+    }
+    var exitErr *exec.ExitError
+    if errors.As(err, &exitErr) {
+        return exitErr.ExitCode()
+    }
+    return -1
+}
 
 // SSH runs an interactive SSH session. Exit code 255 is suppressed because
 // it commonly indicates the user closed the session normally.
@@ -23,20 +36,6 @@ func SSHWithCmd(host string, remoteCmd []string) error {
     args := append([]string{"-t", host}, remoteCmd...)
     cmd := exec.Command("ssh", args...)
     return runSSH(cmd, false)
-}
-
-// SSHOutput runs a non-interactive SSH command and returns its stdout.
-// Used for shell detection via "command -v" inside containers.
-func SSHOutput(host string, remoteCmd []string) (string, error) {
-	args := append([]string{host}, remoteCmd...)
-	cmd := exec.Command("ssh", args...)
-	var stdout bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = nil
-	if err := cmd.Run(); err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(stdout.String()), nil
 }
 
 func runSSH(cmd *exec.Cmd, suppressExit255 bool) error {

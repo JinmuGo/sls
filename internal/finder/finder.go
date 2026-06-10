@@ -322,7 +322,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "backspace":
 			if len(m.query) > 0 {
-				m.query = m.query[:len(m.query)-1]
+				// Delete a whole rune, not a byte, so multi-byte input (e.g.
+				// non-ASCII hostnames) isn't corrupted into invalid UTF-8.
+				r := []rune(m.query)
+				m.query = string(r[:len(r)-1])
 				m.filter()
 				m.cursor = 0
 				if m.previewOpen {
@@ -330,8 +333,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		default:
-			if len(msg.String()) == 1 {
-				m.query += msg.String()
+			// msg.Runes is populated for printable input — single ASCII keys,
+			// space, multi-byte runes, and pasted text alike — and empty for
+			// control/navigation keys (handled above). The previous len()==1
+			// byte check silently dropped non-ASCII characters and pastes.
+			if len(msg.Runes) > 0 {
+				m.query += string(msg.Runes)
 				m.filter()
 				m.cursor = 0
 				if m.previewOpen {

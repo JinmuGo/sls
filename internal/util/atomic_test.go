@@ -78,4 +78,34 @@ func TestAtomicWriteFile(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("writes through symlink, preserving the link", func(t *testing.T) {
+		sdir := t.TempDir()
+		realPath := filepath.Join(sdir, "real.txt")
+		if err := os.WriteFile(realPath, []byte("orig"), 0o644); err != nil {
+			t.Fatalf("seed real file: %v", err)
+		}
+		linkPath := filepath.Join(sdir, "link.txt")
+		if err := os.Symlink(realPath, linkPath); err != nil {
+			t.Skipf("symlinks unsupported: %v", err)
+		}
+
+		if err := AtomicWriteFile(linkPath, []byte("updated"), 0o600); err != nil {
+			t.Fatalf("AtomicWriteFile via symlink: %v", err)
+		}
+
+		// The link must still be a symlink pointing at the real file...
+		info, err := os.Lstat(linkPath)
+		if err != nil {
+			t.Fatalf("Lstat link: %v", err)
+		}
+		if info.Mode()&os.ModeSymlink == 0 {
+			t.Error("symlink was replaced by a regular file")
+		}
+		// ...and the real file must hold the new content.
+		got, _ := os.ReadFile(realPath)
+		if string(got) != "updated" {
+			t.Errorf("real file content = %q, want %q", got, "updated")
+		}
+	})
 }

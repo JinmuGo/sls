@@ -213,8 +213,24 @@ func hasConsent() bool {
 		return strings.TrimSpace(string(data)) == "enabled"
 	}
 
-	// No consent file — prompt the user
+	// No consent file. Only prompt when running interactively — otherwise (piped
+	// stdin, CI, shell-completion generation, scripted `sls connect`) reading
+	// stdin would block or consume unrelated input, and we'd persist a decision
+	// the user never saw. Treat non-interactive as "no consent" without writing
+	// the file, so a later interactive run can still ask.
+	if !isInteractive() {
+		return false
+	}
 	return promptConsent(path)
+}
+
+// isInteractive reports whether stdin is connected to a terminal.
+func isInteractive() bool {
+	fi, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return fi.Mode()&os.ModeCharDevice != 0
 }
 
 func promptConsent(path string) bool {
