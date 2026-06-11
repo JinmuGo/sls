@@ -5,8 +5,10 @@ COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
 DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 BUILT_BY ?= $(shell whoami)
 
-TELEMETRY_ENDPOINT ?= https://telemetry.jinmu.me
-TELEMETRY_API_KEY ?= pulse-dev-key
+# OTLP ingest front door + the CLI's Bearer token. TELEMETRY_API_KEY now carries
+# the ingest Bearer token (a separately-revocable CLI token, not the relay token).
+TELEMETRY_ENDPOINT ?= https://ingest.jinmu.me
+TELEMETRY_API_KEY ?= ingest-dev-token
 
 LDFLAGS := -s -w \
 	-X github.com/jinmugo/sls/cmd.version=$(VERSION) \
@@ -14,7 +16,7 @@ LDFLAGS := -s -w \
 	-X github.com/jinmugo/sls/cmd.date=$(DATE) \
 	-X github.com/jinmugo/sls/cmd.builtBy=$(BUILT_BY) \
 	-X github.com/jinmugo/sls/internal/pulse.defaultEndpoint=$(TELEMETRY_ENDPOINT) \
-	-X github.com/jinmugo/sls/internal/pulse.defaultAPIKey=$(TELEMETRY_API_KEY)
+	-X github.com/jinmugo/sls/internal/pulse.defaultIngestToken=$(TELEMETRY_API_KEY)
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'

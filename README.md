@@ -192,6 +192,8 @@ sls completion [bash|zsh|fish|powershell]
 | `~/.config/sls/meta.json` | Favorites, usage counts, tags |
 | `~/.config/sls/containers.json` | Cached container data |
 | `~/.config/sls/ssh_config` | Generated container SSH entries |
+| `~/.config/sls/telemetry` | Telemetry consent (`enabled`/`disabled`) |
+| `~/.config/sls/anon_id` | Random per-install anonymous id (see Telemetry) |
 
 ## Security
 
@@ -199,3 +201,20 @@ sls completion [bash|zsh|fish|powershell]
 - All file writes use atomic temp-file-then-rename to prevent corruption
 - The generated SSH config is a separate include file, never modifying your hand-crafted SSH config
 - SSH connections use `BatchMode=yes` to prevent hanging on auth prompts during discovery
+
+## Telemetry
+
+sls collects **anonymous, opt-in** usage data to guide what to improve. On first
+interactive run it asks for consent (stored in `~/.config/sls/telemetry`); it never
+prompts in non-interactive/CI/piped contexts and stays off until you opt in.
+
+- **Collected:** command name (e.g. `connect`, `scan`), OS, architecture, sls
+  version, and a random per-install `anon_id` (a v4 UUID in `~/.config/sls/anon_id`,
+  generated from randomness alone — not derived from any hostname, user, or machine).
+- **Never collected:** hostnames, IP addresses, SSH config, container names, paths,
+  or any personal data.
+- **Opt out anytime:** `export PULSE_DISABLED=1` (or `SLS_TELEMETRY=off`), or set
+  `disabled` in `~/.config/sls/telemetry`.
+
+Events are sent fire-and-forget (short timeout, failures ignored) as OTLP/HTTP logs
+to a self-hosted collector and never block or slow down the CLI.
