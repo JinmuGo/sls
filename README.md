@@ -66,6 +66,29 @@ go install github.com/jinmugo/sls@latest
 
 Download platform-specific binaries from the [Releases](https://github.com/jinmugo/sls/releases) page.
 
+## Updating
+
+sls checks for a newer release in the background (at most once a day) and shows a
+small `⬆ sls vX.Y.Z available` line in the dashboard when one exists. To upgrade:
+
+```bash
+sls update
+```
+
+`sls update` detects how sls was installed and runs the matching command —
+`brew upgrade sls` for Homebrew, the Linux package one-liner for deb/rpm,
+`go install …@latest` for source installs — asking for confirmation first.
+Manually-downloaded binaries are pointed at the releases page instead.
+
+```bash
+sls update --check   # report whether an update is available, without installing
+sls update --yes     # upgrade without the confirmation prompt
+```
+
+The background check is anonymous (a single request to the GitHub releases API),
+silent on failure, and skipped on dev builds and in non-interactive sessions.
+Disable it entirely with `export SLS_NO_UPDATE_CHECK=1`.
+
 ## Quick Start
 
 ```bash
@@ -194,6 +217,7 @@ sls completion [bash|zsh|fish|powershell]
 | `~/.config/sls/ssh_config` | Generated container SSH entries |
 | `~/.config/sls/telemetry` | Telemetry consent (`enabled`/`disabled`) |
 | `~/.config/sls/anon_id` | Random per-install anonymous id (see Telemetry) |
+| `~/.config/sls/update.json` | Cached latest-version check (see Updating) |
 
 ## Security
 

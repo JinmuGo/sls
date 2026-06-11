@@ -17,6 +17,7 @@ import (
 	"github.com/jinmugo/sls/internal/hostinfo"
 	"github.com/jinmugo/sls/internal/onboarding"
 	"github.com/jinmugo/sls/internal/pulse"
+	"github.com/jinmugo/sls/internal/updater"
 	sshconfig "github.com/kevinburke/ssh_config"
 	"github.com/spf13/cobra"
 )
@@ -102,6 +103,15 @@ func runInteractive(extraSSHArgs []string) error {
 	var restoreAlias string
 	hasScanned := len(cache.Hosts) > 0
 
+	// Update check: build a banner from the last cached result, then refresh the
+	// cache in the background for next time. No-op when disabled, on dev builds,
+	// or when not running interactively.
+	var updateBanner string
+	if notice := updater.Cached(version); notice != nil {
+		updateBanner = fmt.Sprintf("⬆ sls %s available · run 'sls update'", notice.Latest)
+	}
+	updater.RefreshAsync(version)
+
 	// Main loop
 	for {
 		if needReloadHosts {
@@ -137,6 +147,7 @@ func runInteractive(extraSSHArgs []string) error {
 			HasScanned:     hasScanned,
 			InfoFetcher:    infoFetcher,
 			InfoCache:      infoCache,
+			UpdateBanner:   updateBanner,
 		}
 		if cacheWarning != "" {
 			opts.StatusMsg = cacheWarning
@@ -345,6 +356,9 @@ func Execute() {
 	pulse.Init(version)
 	defer pulse.Shutdown()
 
+	// Inject the running version so `sls update` can compare against the latest.
+	cli.Version = version
+
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
@@ -359,6 +373,7 @@ func init() {
 	rootCmd.AddCommand(cli.DiscoverCmd)
 	rootCmd.AddCommand(cli.ConnectCmd)
 	rootCmd.AddCommand(cli.GenCmd)
+	rootCmd.AddCommand(cli.UpdateCmd)
 
 	rootCmd.Flags().StringVarP(&filterTag, "tag", "t", "", "Filter hosts by tag")
 }

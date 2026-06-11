@@ -38,13 +38,14 @@ type HostInfoFetcher interface {
 
 // SelectOpts configures the finder behavior.
 type SelectOpts struct {
-	StatusMsg      string           // temporary status message (e.g., "✓ Starred prod")
-	RestoreAlias   string           // alias to restore cursor to after rebuild
-	HostCount      int              // number of hosts (for header)
-	ContainerCount int              // number of containers (for header)
-	HasScanned     bool             // true if user has ever scanned (hides first-run hint)
-	InfoFetcher    HostInfoFetcher  // optional: provides host info for preview panel
-	InfoCache      *hostinfo.Cache  // optional: disk cache for persistence across sessions
+	StatusMsg      string          // temporary status message (e.g., "✓ Starred prod")
+	RestoreAlias   string          // alias to restore cursor to after rebuild
+	HostCount      int             // number of hosts (for header)
+	ContainerCount int             // number of containers (for header)
+	HasScanned     bool            // true if user has ever scanned (hides first-run hint)
+	InfoFetcher    HostInfoFetcher // optional: provides host info for preview panel
+	InfoCache      *hostinfo.Cache // optional: disk cache for persistence across sessions
+	UpdateBanner   string          // optional: persistent "update available" line
 }
 
 // Select launches the interactive finder TUI and returns the selected item's alias.
@@ -96,20 +97,21 @@ type model struct {
 	hostCount      int
 	containerCount int
 	hasScanned     bool
+	updateBanner   string // persistent "update available" line (empty when none)
 
 	// Preview panel
-	previewOpen   bool
-	infoFetcher   HostInfoFetcher
-	infoCache     *hostinfo.Cache
-	infoDirty     bool                       // true if cache was updated (needs flush)
-	infoMem       map[string]*hostinfo.HostInfo // in-memory cache for current session
-	loadingHost   string
-	fetchGen      uint64
-	cancelFetch   context.CancelFunc
-	listWidth     int
-	previewWidth  int
-	fetchDebounce *time.Timer
-	saveDebounce  *time.Timer
+	previewOpen    bool
+	infoFetcher    HostInfoFetcher
+	infoCache      *hostinfo.Cache
+	infoDirty      bool                          // true if cache was updated (needs flush)
+	infoMem        map[string]*hostinfo.HostInfo // in-memory cache for current session
+	loadingHost    string
+	fetchGen       uint64
+	cancelFetch    context.CancelFunc
+	listWidth      int
+	previewWidth   int
+	fetchDebounce  *time.Timer
+	saveDebounce   *time.Timer
 	prevCursorHost string // track cursor host to detect changes
 }
 
@@ -145,6 +147,7 @@ func newModel(items []Item, opts SelectOpts) model {
 		hasScanned:     opts.HasScanned,
 		infoFetcher:    opts.InfoFetcher,
 		infoCache:      opts.InfoCache,
+		updateBanner:   opts.UpdateBanner,
 		infoMem:        make(map[string]*hostinfo.HostInfo),
 	}
 
@@ -458,6 +461,11 @@ func (m model) View() string {
 	}
 	header += "\n" + StyleDim.Render(countStr)
 
+	// Persistent update-available banner
+	if m.updateBanner != "" {
+		header += "\n" + StyleDim.Render(m.updateBanner)
+	}
+
 	// Status flash
 	if m.statusMsg != "" {
 		header += "\n" + m.statusMsg
@@ -465,6 +473,9 @@ func (m model) View() string {
 
 	// Calculate available height
 	headerLines := 2
+	if m.updateBanner != "" {
+		headerLines++
+	}
 	if m.statusMsg != "" {
 		headerLines++
 	}
@@ -673,9 +684,9 @@ func (m model) buildHintBar() string {
 
 	// Full hints
 	if isContainer {
-		return "\n" + StyleDim.Render("  ^j/k up/down · enter connect · ^r rename · ^f star · ^d delete" + previewHint + " · esc quit")
+		return "\n" + StyleDim.Render("  ^j/k up/down · enter connect · ^r rename · ^f star · ^d delete"+previewHint+" · esc quit")
 	}
-	return "\n" + StyleDim.Render("  ^j/k up/down · enter connect · ^r rename · ^s scan · ^f star · ^d delete" + previewHint + " · esc quit")
+	return "\n" + StyleDim.Render("  ^j/k up/down · enter connect · ^r rename · ^s scan · ^f star · ^d delete"+previewHint+" · esc quit")
 }
 
 // truncatePlain truncates a plain-text string to maxWidth runes.
