@@ -45,9 +45,14 @@ type cacheData struct {
 }
 
 // Cached returns a Notice if the cached latest version is newer than current,
-// otherwise nil. A missing or corrupt cache yields nil (never an error) so the
-// banner path is always silent.
+// otherwise nil. It honors the static opt-outs (SLS_NO_UPDATE_CHECK and dev/empty
+// builds) so a source build never nags, even when the shared cache holds a newer
+// release written by an installed sls on the same machine. A missing or corrupt
+// cache yields nil (never an error) so the banner path is always silent.
 func Cached(current string) *Notice {
+	if optedOut(current, os.Getenv) {
+		return nil
+	}
 	c, err := readCache()
 	if err != nil || c == nil {
 		return nil
@@ -87,15 +92,21 @@ func Outdated(current, latest string) bool {
 	return compareVersions(latest, current) > 0
 }
 
-// checkEnabled reports whether the update check should run at all.
-func checkEnabled(current string, env func(string) string, interactive bool) bool {
+// optedOut reports the static opt-outs that disable the update feature entirely,
+// independent of interactivity: the SLS_NO_UPDATE_CHECK env var and dev/source
+// builds (version "dev" or empty). Both the banner and the background refresh
+// respect these.
+func optedOut(current string, env func(string) string) bool {
 	if v := env("SLS_NO_UPDATE_CHECK"); v == "1" || v == "true" {
-		return false
+		return true
 	}
-	if current == "" || current == "dev" {
-		return false
-	}
-	return interactive
+	return current == "" || current == "dev"
+}
+
+// checkEnabled reports whether the background update check should run at all: not
+// opted out, and running interactively.
+func checkEnabled(current string, env func(string) string, interactive bool) bool {
+	return !optedOut(current, env) && interactive
 }
 
 // needsRefresh reports whether a background refresh is warranted: the check must

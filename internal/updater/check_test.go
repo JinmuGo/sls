@@ -49,6 +49,7 @@ func TestCached(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv("HOME", t.TempDir())
+			t.Setenv("SLS_NO_UPDATE_CHECK", "") // isolate from the developer's shell
 			switch {
 			case tt.corrupt:
 				p, _ := cachePath()
@@ -69,6 +70,48 @@ func TestCached(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestCachedRespectsGuards verifies that the banner path honors the same opt-outs
+// as the background refresh: a dev build and SLS_NO_UPDATE_CHECK must show no
+// banner even when a newer version sits in the cache. A regression here is what
+// made a locally-built `./sls` (version "dev") nag about an update.
+func TestCachedRespectsGuards(t *testing.T) {
+	t.Run("dev build shows no banner despite a newer cache", func(t *testing.T) {
+		t.Setenv("HOME", t.TempDir())
+		t.Setenv("SLS_NO_UPDATE_CHECK", "")
+		writeTestCache(t, cacheData{LatestVersion: "v1.3.0"})
+		if got := Cached("dev"); got != nil {
+			t.Errorf("Cached(%q) = %+v, want nil (dev builds must not nag)", "dev", got)
+		}
+	})
+
+	t.Run("empty version shows no banner", func(t *testing.T) {
+		t.Setenv("HOME", t.TempDir())
+		t.Setenv("SLS_NO_UPDATE_CHECK", "")
+		writeTestCache(t, cacheData{LatestVersion: "v1.3.0"})
+		if got := Cached(""); got != nil {
+			t.Errorf("Cached(%q) = %+v, want nil", "", got)
+		}
+	})
+
+	t.Run("opt-out env shows no banner", func(t *testing.T) {
+		t.Setenv("HOME", t.TempDir())
+		t.Setenv("SLS_NO_UPDATE_CHECK", "1")
+		writeTestCache(t, cacheData{LatestVersion: "v1.3.0"})
+		if got := Cached("1.1.1"); got != nil {
+			t.Errorf("Cached with SLS_NO_UPDATE_CHECK=1 = %+v, want nil", got)
+		}
+	})
+
+	t.Run("normal build still shows the banner", func(t *testing.T) {
+		t.Setenv("HOME", t.TempDir())
+		t.Setenv("SLS_NO_UPDATE_CHECK", "")
+		writeTestCache(t, cacheData{LatestVersion: "v1.3.0"})
+		if got := Cached("1.1.1"); got == nil {
+			t.Error("Cached(\"1.1.1\") = nil, want a notice")
+		}
+	})
 }
 
 func TestFetchLatest(t *testing.T) {
