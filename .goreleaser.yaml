@@ -72,8 +72,6 @@ brews:
       system "#{bin}/sls version"
     install: |
       bin.install "sls"
-    dependencies:
-      - name: fzf
 
 nfpms:
   - id: sls
@@ -86,8 +84,6 @@ nfpms:
     formats:
       - deb
       - rpm
-    dependencies:
-      - fzf
     bindir: /usr/bin
     contents:
       - src: ./LICENSE
