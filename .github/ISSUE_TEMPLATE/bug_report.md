@@ -26,7 +26,6 @@ Describe what you expected to happen instead.
 
 - OS: [e.g. macOS Ventura, Ubuntu 22.04]
 - sls version: output of `sls --version`
-- fzf version: output of `fzf --version`
 
 ## Additional Context
 
