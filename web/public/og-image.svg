@@ -1,0 +1,28 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#09090b"/>
+
+  <!-- Whisper-quiet inset frame -->
+  <rect x="24" y="24" width="1152" height="582" rx="14" fill="none" stroke="#27272a" stroke-width="1.25" stroke-opacity="0.7"/>
+
+  <!-- Wordmark: "sls" + orange block cursor -->
+  <text x="86" y="210" font-family="Geist" font-weight="700" font-size="162" letter-spacing="-6" fill="#fafafa">sls</text>
+  <rect x="316" y="108" width="68" height="102" rx="6" fill="#ff6b00"/>
+
+  <!-- Headline (two lines) -->
+  <text x="86" y="310" font-family="Geist" font-weight="600" font-size="50" letter-spacing="-1.2" fill="#fafafa">Find, connect, and manage</text>
+  <text x="86" y="368" font-family="Geist" font-weight="600" font-size="50" letter-spacing="-1.2" fill="#fafafa">everything you SSH into.</text>
+
+  <!-- Subtitle -->
+  <text x="86" y="418" font-family="Geist" font-weight="400" font-size="24" letter-spacing="-0.2" fill="#a1a1aa">A smart, zero-dependency terminal dashboard for SSH hosts &amp; Docker containers.</text>
+
+  <!-- Install pill -->
+  <rect x="86" y="468" width="556" height="56" rx="10" fill="#000000" stroke="#27272a" stroke-width="1.5"/>
+  <text x="110" y="504" font-family="Geist Mono" font-weight="500" font-size="24" fill="#52525b">$<tspan fill="#fafafa" dx="14">brew install jinmugo/tap/sls</tspan></text>
+
+  <!-- Footer left -->
+  <text x="86" y="572" font-family="Geist Mono" font-weight="400" font-size="20" fill="#52525b">sls.jinmu.me</text>
+
+  <!-- Footer right -->
+  <text x="1116" y="572" text-anchor="end" font-family="Geist Mono" font-weight="400" font-size="20" fill="#52525b">github.com/jinmugo/sls</text>
+</svg>
